@@ -8,6 +8,19 @@ typedef struct
     int regValue;
 } Register;
 
+typedef struct
+{
+    int opcode;
+    int r1;
+    int r2;
+    int r3;
+    int shamt;
+    int imm;
+    int address;
+} DecodedValues{
+    /* data */
+};
+
 Register *registerInit(int regCount)
 {
     // Register zeroReg;
@@ -41,6 +54,7 @@ int mainMemory[2048];
 int zeroFlag = 0;
 Register PC = {"PC", 0};
 Register *registerFile;
+DecodedValues decodedValues;
 
 // Binary int format in c is 0b00000000000000000000000000000000 (32 bits)
 int fetch()
@@ -53,20 +67,18 @@ int fetch()
 void decode(int instruction)
 {
 
-
-    int opcode = (instruction & 0b11110000000000000000000000000000) >> 28;
-    int r1 = (instruction & 0b00001111100000000000000000000000) >> 23;
-    int r2 = (instruction & 0b00000000011111000000000000000000) >> 18;
-    int r3 = (instruction & 0b00000000000000111110000000000000) >> 13;
-    int shamt = (instruction & 0b00000000000000000001111111111111);
-    int imm = (instruction & 0b00000000000000111111111111111111);
-    int address = (instruction & 0b00001111111111111111111111111111);
-
-    
+    decodedValues.opcode = (instruction & 0b11110000000000000000000000000000) >> 28;
+    decodedValues.r1 = (instruction & 0b00001111100000000000000000000000) >> 23;
+    decodedValues.r2 = (instruction & 0b00000000011111000000000000000000) >> 18;
+    decodedValues.r3 = (instruction & 0b00000000000000111110000000000000) >> 13;
+    decodedValues.shamt = (instruction & 0b00000000000000000001111111111111);
+    decodedValues.imm = (instruction & 0b00000000000000111111111111111111);
+    decodedValues.address = (instruction & 0b00001111111111111111111111111111);
 }
 
 int ALU(int operandA, int operandB, int operation)
 {
+
     int output = 0;
     zeroFlag = 0;
 
