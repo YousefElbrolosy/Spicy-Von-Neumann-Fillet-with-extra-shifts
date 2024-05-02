@@ -13,6 +13,18 @@ typedef struct
 
 Register *registerInit(int regCount)
 {
+    // Register zeroReg;
+    // zeroReg.regName = "zReg";
+    // zeroReg.regValue = 0;
+
+    // /* using memcpy to copy string: */
+    // char zeroRegName = "zReg";
+    // memcpy(zeroReg.regName, zeroRegName, strlen(zeroRegName) + 1);
+    // zeroReg.regValue = 0;
+
+    // /* using memcpy to copy structure: */
+    // memcpy(&person_copy, &person, sizeof(person));
+
     Register *registers = malloc(regCount * sizeof(Register));
     for (int i = 0; i < regCount; ++i)
     {
@@ -26,12 +38,12 @@ Register *registerInit(int regCount)
     return registers;
 }
 
-
-
 // Binary int format in c is 0b00000000000000000000000000000000 (32 bits)
 
 void decode(int instruction)
 {
+
+    
 }
 
 void fetch()
