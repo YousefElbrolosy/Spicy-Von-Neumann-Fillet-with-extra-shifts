@@ -23,7 +23,7 @@ Register *registerInit(int regCount)
     // memcpy(&person_copy, &person, sizeof(person));
 
     Register *registers = malloc(regCount * sizeof(Register));
-    const Register ZERO_REGISTER= {"R0", 0};
+    const Register ZERO_REGISTER = {"R0", 0};
     registers[0] = ZERO_REGISTER;
     for (int i = 1; i < regCount; i++)
     {
@@ -52,6 +52,17 @@ int fetch()
 
 void decode(int instruction)
 {
+
+
+    int opcode = (instruction & 0b11110000000000000000000000000000) >> 28;
+    int r1 = (instruction & 0b00001111100000000000000000000000) >> 23;
+    int r2 = (instruction & 0b00000000011111000000000000000000) >> 18;
+    int r3 = (instruction & 0b00000000000000111110000000000000) >> 13;
+    int shamt = (instruction & 0b00000000000000000001111111111111);
+    int imm = (instruction & 0b00000000000000111111111111111111);
+    int address = (instruction & 0b00001111111111111111111111111111);
+
+    
 }
 
 int ALU(int operandA, int operandB, int operation)
