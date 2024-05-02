@@ -1,9 +1,6 @@
 #include <stdio.h>
-
+#include <stdlib.h>
 // int NumberofInstructions = sizeof(instructionMemory) / sizeof(int);
-int mainMemory[2048];
-Register registerFile[];
-int zeroFlag = 0;
 
 typedef struct
 {
@@ -26,27 +23,34 @@ Register *registerInit(int regCount)
     // memcpy(&person_copy, &person, sizeof(person));
 
     Register *registers = malloc(regCount * sizeof(Register));
-    for (int i = 0; i < regCount; ++i)
+    const Register ZERO_REGISTER= {"R0", 0};
+    registers[0] = ZERO_REGISTER;
+    for (int i = 1; i < regCount; i++)
     {
         Register reg;
         sprintf(reg.regName, "R%d", i);
         reg.regValue = 0;
         registers[i] = reg;
     }
-    sprintf(registers[regCount - 1].regName, "PC");
-    registers[regCount - 1].regValue = 0;
+
     return registers;
 }
 
+// Global Initialisation
+int mainMemory[2048];
+int zeroFlag = 0;
+Register PC = {"PC", 0};
+Register *registerFile;
+
 // Binary int format in c is 0b00000000000000000000000000000000 (32 bits)
-
-void decode(int instruction)
+int fetch()
 {
-
-    
+    int instruction = mainMemory[registerFile[32].regValue];
+    registerFile[32].regValue++;
+    return instruction;
 }
 
-void fetch()
+void decode(int instruction)
 {
 }
 
@@ -106,7 +110,9 @@ int ALU(int operandA, int operandB, int operation)
 
 int main()
 {
-    // initializing register file
-    Register registerFile[] = registerInit(33);
+    registerFile = registerInit(32);
+    printf("%d", registerFile[32].regValue);
+    fetch(registerFile);
+    printf("%d", registerFile[32].regValue);
     return 0;
 }
