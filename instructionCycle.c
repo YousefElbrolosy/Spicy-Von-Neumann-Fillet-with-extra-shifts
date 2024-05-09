@@ -134,7 +134,7 @@ void freeSplit(char **split, int numTokens)
     free(split);
 }
 
-int parse()
+int *parse()
 {
     // char fileName[] = "MIPS.txt";
     FILE *input;
@@ -149,10 +149,19 @@ int parse()
     int address;
     int shamt;
     char instType;
-
+    int count = 0;
+    
     // 0000 1111
     while (fgets(instruction, 100, input))
     {
+        count++;
+    }
+    fclose(input);
+    input = fopen("filename.txt", "r");
+    int c = 0;
+    int* instructions = malloc(count*sizeof(int));
+    while (fgets(instruction, 100, input))
+    {   
         char **instructionSplitted = mySplit(instruction);
         // what to do with first line
         if (strcmp(instructionSplitted[0], "ADD") == 0)
@@ -221,54 +230,35 @@ int parse()
         }
         int R1;
         int R2;
-        int R3;
-        int shamt;
+        int R3 = 0;
+        int shamt = 0;
         int imm;
         switch (instType)
         {
         case 'R':
             R1 = parseRegNum(instructionSplitted[1]);
             R2 = parseRegNum(instructionSplitted[2]);
-            R3 = parseRegNum(instructionSplitted[3]);
-            if(len(instructionSplitted) == 5){
-                shamt = parseRegNum(instructionSplitted[4]);
-            }
-            else{
-                shamt = 0;
-            }
-            instructionType = instructionType + (R1 << 23) + (R2 << 18) + (R3 << 13) + (shamt);
-            printf("%d",len(instructionSplitted));
-
+            if (strcmp(instructionSplitted[0], "ADD") || strcmp(instructionSplitted[0], "SUB"))
+                R3 = parseRegNum(instructionSplitted[3]);
+            else
+                shamt = parseRegNum(instructionSplitted[3]);
+            instructionType = instructionType | R1 << 23 | R2 << 18 | R3 << 13 | shamt;
             break;
         case 'I':
             R1 = parseRegNum(instructionSplitted[1]);
             R2 = parseRegNum(instructionSplitted[2]);
             imm = parseInt(instructionSplitted[3]);
             instructionType = instructionType | R1 << 23 | R2 << 18 | imm;
-            printf("Instruction Type = %d\n", instructionType);
             break;
         case 'J':
-
+            address = parseInt(instructionSplitted[1]);
+            instructionType = instructionType | address;
             break;
         }
-
-        switch (instruction[1])
-        {
-        case 'R1':
-            instructionType = 0b00000000000000000000000000000000;
-            break;
-        case 'R':
-            instructionType = 0b00010000000000000000000000000000;
-            break;
-        case 'ADDRESS':
-            instructionType = 0b00010000000000000000000000000000;
-            break;
-        }
-
-        char operation[5];
+        instructions[c++]=instructionType;
     }
     fclose(input);
-    return 0;
+    return instructions;
 }
 
 int fetch()
