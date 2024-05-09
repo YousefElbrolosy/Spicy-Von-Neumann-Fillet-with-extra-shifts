@@ -68,6 +68,24 @@ Register *registerInit(int regCount)
     return registers;
 }
 
+int parseRegNum(char test[])
+{
+    char res[strlen(test) - 1];
+    int intRes;
+    for (int i = 1; i < strlen(test); i++)
+    {
+        res[i - 1] = test[i];
+    }
+    intRes = atol(res);
+    return intRes;
+}
+int parseInt(char test[])
+{
+    int intRes;
+    intRes = atol(test);
+    return intRes;
+}
+
 // Binary int format in c is 0b00000000000000000000000000000000 (32 bits)
 
 char **mySplit(char *str)
@@ -118,63 +136,139 @@ void freeSplit(char **split, int numTokens)
 
 int parse()
 {
-    char fileName[] = "MIPS.txt";
+    // char fileName[] = "MIPS.txt";
     FILE *input;
     // Open a file in read mode
     input = fopen("filename.txt", "r");
     char instruction[100];
     int instructionType;
+    int registerSource;
+    int registerDest;
+    int registerTarget;
+    int imm;
+    int address;
+    int shamt;
+    char instType;
+
+    // 0000 1111
     while (fgets(instruction, 100, input))
     {
-        char **split = mySplit(instruction);
+        char **instructionSplitted = mySplit(instruction);
         // what to do with first line
-        for (int i = 0; i < strlen(instruction); i++)
+        if (strcmp(instructionSplitted[0], "ADD") == 0)
         {
-
-            switch (instruction[0])
-            {
-
-            case 'ADD':
-                instructionType = 0b0000;
-                break;
-            case 'SUB':
-                instructionType = 0b0001;
-                break;
-            case 'MULI':
-                instructionType = 0b0010;
-                break;
-            case 'ADDI':
-                instructionType = 0b0011;
-                break;
-            case 'BNE':
-                instructionType = 0b0100;
-                break;
-            case 'ANDI':
-                instructionType = 0b0101;
-                break ;
-            case 'ORI':
-                instructionType = 0b0110;
-                break;
-            case 'J':
-                instructionType = 0b0111;
-                break;
-            case 'SLL':
-                instructionType = 0b1000;
-                break;
-            case 'SRL':
-                instructionType = 0b1001;
-                break;
-            case 'LW':
-                instructionType = 0b1010;
-                break;
-            case 'SW':
-                instructionType = 0b1011;
-                break;
-            };
+            instructionType = 0b00000000000000000000000000000000;
+            instType = 'R';
         }
-    }
+        else if (strcmp(instructionSplitted[0], "SUB") == 0)
+        {
+            instructionType = 0b00010000000000000000000000000000;
+            instType = 'R';
+        }
+        else if (strcmp(instructionSplitted[0], "MULI") == 0)
+        {
+            instructionType = 0b00100000000000000000000000000000;
+            instType = 'I';
+        }
+        else if (strcmp(instructionSplitted[0], "ADDI") == 0)
+        {
+            instructionType = 0b00110000000000000000000000000000;
+            instType = 'I';
+        }
+        else if (strcmp(instructionSplitted[0], "BNE") == 0)
+        {
+            instructionType = 0b01000000000000000000000000000000;
+            instType = 'I';
+        }
+        else if (strcmp(instructionSplitted[0], "ANDI") == 0)
+        {
+            instructionType = 0b01010000000000000000000000000000;
+            instType = 'I';
+        }
+        else if (strcmp(instructionSplitted[0], "ORI") == 0)
+        {
+            instructionType = 0b01100000000000000000000000000000;
+            instType = 'I';
+        }
+        else if (strcmp(instructionSplitted[0], "J") == 0)
+        {
+            instructionType = 0b01110000000000000000000000000000;
+            instType = 'J';
+        }
+        else if (strcmp(instructionSplitted[0], "SLL") == 0)
+        {
+            instructionType = 0b10000000000000000000000000000000;
+            instType = 'R';
+        }
+        else if (strcmp(instructionSplitted[0], "SRL") == 0)
+        {
+            instructionType = 0b10010000000000000000000000000000;
+            instType = 'R';
+        }
+        else if (strcmp(instructionSplitted[0], "LW") == 0)
+        {
+            instructionType = 0b10100000000000000000000000000000;
+            instType = 'I';
+        }
+        else if (strcmp(instructionSplitted[0], "SW") == 0)
+        {
+            instructionType = 0b10110000000000000000000000000000;
+            instType = 'I';
+        }
+        else
+        {
+            continue;
+        }
+        int R1;
+        int R2;
+        int R3;
+        int shamt;
+        int imm;
+        switch (instType)
+        {
+        case 'R':
+            R1 = parseRegNum(instructionSplitted[1]);
+            R2 = parseRegNum(instructionSplitted[2]);
+            R3 = parseRegNum(instructionSplitted[3]);
+            if(len(instructionSplitted) == 5){
+                shamt = parseRegNum(instructionSplitted[4]);
+            }
+            else{
+                shamt = 0;
+            }
+            instructionType = instructionType + (R1 << 23) + (R2 << 18) + (R3 << 13) + (shamt);
+            printf("%d",len(instructionSplitted));
 
-    char operation[5];
+            break;
+        case 'I':
+            R1 = parseRegNum(instructionSplitted[1]);
+            R2 = parseRegNum(instructionSplitted[2]);
+            imm = parseInt(instructionSplitted[3]);
+            instructionType = instructionType | R1 << 23 | R2 << 18 | imm;
+            printf("Instruction Type = %d\n", instructionType);
+            break;
+        case 'J':
+
+            break;
+        }
+
+        switch (instruction[1])
+        {
+        case 'R1':
+            instructionType = 0b00000000000000000000000000000000;
+            break;
+        case 'R':
+            instructionType = 0b00010000000000000000000000000000;
+            break;
+        case 'ADDRESS':
+            instructionType = 0b00010000000000000000000000000000;
+            break;
+        }
+
+        char operation[5];
+    }
+    fclose(input);
+    return 0;
 }
 
 int fetch()
@@ -185,8 +279,8 @@ int fetch()
 }
 
 void decode1(int instruction)
-{
 
+{
     decodedValues.opcode = (instruction & 0b11110000000000000000000000000000) >> 28;
     decodedValues.r1 = (instruction & 0b00001111100000000000000000000000) >> 23;
     decodedValues.r2 = (instruction & 0b00000000011111000000000000000000) >> 18;
@@ -258,11 +352,25 @@ int ALU(int operandA, int operandB, int operation)
     return output;
 }
 
+int checkControlHazard(int instruction)
+{
+    int opCode = instruction >> 28;
+    if (opCode == 0b0101 || opCode == 0b0111)
+    {
+        return 1;
+    }
+    return 0;
+}
+
 int main()
 {
+
     registerFile.registerArray = registerInit(32);
-    printf("%d", registerFile.registerArray[32].regValue);
-    fetch(registerFile);
-    printf("%d", registerFile.registerArray[32].regValue);
+    // printf("%d", registerFile.registerArray[32].regValue);
+    // // fetch(registerFile);
+    // printf("%d", registerFile.registerArray[32].regValue);
+    parse();
+    char test[3] = "R32";
+
     return 0;
 }
