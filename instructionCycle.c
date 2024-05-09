@@ -19,8 +19,11 @@ typedef struct
 {
     Register *registerArray;
     int regWrite;
-    int readReg1;
+    int readReg1; 
     int readReg2;
+    int readData1;
+    int readData2;
+    int writeData;
 } RegisterFile;
 
 typedef struct
@@ -28,9 +31,10 @@ typedef struct
     int branch;
     int memRead;
     int memWrite;
-    int memtoReg;
-    int ALUSrc;
+    int memToReg;
+    int ALUsrc;
     int regWrite;
+    int regDst;
 } ControlUnit;
 
 typedef struct
@@ -265,21 +269,32 @@ void decode1(int instruction)
 
 {
     decodedValues.opcode = (instruction & 0b11110000000000000000000000000000) >> 28;
-    decodedValues.r1 = (instruction & 0b00001111100000000000000000000000) >> 23;
-    decodedValues.r2 = (instruction & 0b00000000011111000000000000000000) >> 18;
-    decodedValues.r3 = (instruction & 0b00000000000000111110000000000000) >> 13;
+    registerFile.regWrite = (instruction & 0b00001111100000000000000000000000) >> 23;
+    registerFile.readReg1 = (instruction & 0b00000000011111000000000000000000) >> 18;
+    registerFile.readReg2 = (instruction & 0b00000000000000111110000000000000) >> 13;
     decodedValues.shamt = (instruction & 0b00000000000000000001111111111111);
     decodedValues.imm = (instruction & 0b00000000000000111111111111111111);
     decodedValues.address = (instruction & 0b00001111111111111111111111111111);
 }
+void decode2(int instruction)
+{
+    registerFile.readData1=(registerFile.registerArray[registerFile.readReg1]);
+    
+}
+
 
 void controlUnitSignals(int opcode)
 {
     CU.memRead = opcode == 10;
     CU.memWrite = opcode == 5;
-    CU.ALUSrc = opcode == 2 || opcode == 3 || opcode == 5 || opcode == 6 || opcode == 9 || opcode == 10;
+    CU.ALUsrc = opcode == 2 || opcode == 3 || opcode== 4|| opcode == 5 || opcode == 6 || opcode == 10 || opcode == 11;
     CU.regWrite = opcode == 0 || opcode == 1 || opcode == 2 || opcode == 3 || opcode == 5 || opcode == 6 || opcode == 8 || opcode == 9 || opcode == 10;
-    CU.memtoReg = opcode == 11;
+    CU.memToReg = opcode == 10;
+    CU.branch= opcode==4;
+    CU.regDst= opcode==0 || opcode==1 || opcode==8 || opcode==9;
+
+
+
 }
 
 int ALU(int operandA, int operandB, int operation)
