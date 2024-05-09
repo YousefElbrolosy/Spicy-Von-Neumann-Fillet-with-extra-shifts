@@ -44,7 +44,7 @@ typedef struct
     int address;
 } DecodedValues;
 
-// Global Initialisation
+// Global Initialization
 MainMemory mainMemory;
 RegisterFile registerFile;
 Register PC = {"PC", 0};
@@ -125,6 +125,7 @@ char **mySplit(char *str)
     return storeSplit;
 }
 
+
 void freeSplit(char **split, int numTokens)
 {
     for (int i = 0; i < numTokens; i++)
@@ -134,12 +135,11 @@ void freeSplit(char **split, int numTokens)
     free(split);
 }
 
-int *parse()
+void parse()
 {
     // char fileName[] = "MIPS.txt";
     FILE *input;
     // Open a file in read mode
-    input = fopen("filename.txt", "r");
     char instruction[100];
     int instructionType;
     int registerSource;
@@ -149,17 +149,10 @@ int *parse()
     int address;
     int shamt;
     char instType;
-    int count = 0;
     
-    // 0000 1111
-    while (fgets(instruction, 100, input))
-    {
-        count++;
-    }
-    fclose(input);
+   
     input = fopen("filename.txt", "r");
     int c = 0;
-    int* instructions = malloc(count*sizeof(int));
     while (fgets(instruction, 100, input))
     {   
         char **instructionSplitted = mySplit(instruction);
@@ -249,16 +242,16 @@ int *parse()
             R2 = parseRegNum(instructionSplitted[2]);
             imm = parseInt(instructionSplitted[3]);
             instructionType = instructionType | R1 << 23 | R2 << 18 | imm;
+
             break;
         case 'J':
             address = parseInt(instructionSplitted[1]);
             instructionType = instructionType | address;
             break;
         }
-        instructions[c++]=instructionType;
+        mainMemory.mainMemory[c++]=instructionType;
     }
     fclose(input);
-    return instructions;
 }
 
 int fetch()
@@ -360,7 +353,9 @@ int main()
     // // fetch(registerFile);
     // printf("%d", registerFile.registerArray[32].regValue);
     parse();
-    char test[3] = "R32";
+    printf("%d\n", mainMemory.mainMemory[0]);
+    printf("%d\n", mainMemory.mainMemory[1]);
+    printf("%d\n", mainMemory.mainMemory[2]);
 
     return 0;
 }
