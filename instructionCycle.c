@@ -19,11 +19,8 @@ typedef struct
 {
     Register *registerArray;
     int regWrite;
-    int readReg1; 
+    int readReg1;
     int readReg2;
-    int readData1;
-    int readData2;
-    int writeData;
 } RegisterFile;
 
 typedef struct
@@ -31,14 +28,10 @@ typedef struct
     int branch;
     int memRead;
     int memWrite;
-    int memToReg;
-    int ALUsrc;
+    int memtoReg;
+    int ALUSrc;
     int regWrite;
-<<<<<<< HEAD
     int jump;
-=======
-    int regDst;
->>>>>>> 2030415a3f7f295cb7f3534d7b4f4880d3f51f47
 } ControlUnit;
 
 typedef struct
@@ -52,7 +45,6 @@ typedef struct
     int address;
 } DecodedValues;
 
-<<<<<<< HEAD
 typedef struct
 {
     int result;
@@ -60,9 +52,6 @@ typedef struct
 }ALUOutput;
 
 // Global Initialisation
-=======
-// Global Initialization
->>>>>>> 2030415a3f7f295cb7f3534d7b4f4880d3f51f47
 MainMemory mainMemory;
 RegisterFile registerFile;
 Register PC = {"PC", 0};
@@ -112,24 +101,6 @@ Register *registerInit(int regCount)
     return registers;
 }
 
-int parseRegNum(char test[])
-{
-    char res[strlen(test) - 1];
-    int intRes;
-    for (int i = 1; i < strlen(test); i++)
-    {
-        res[i - 1] = test[i];
-    }
-    intRes = atol(res);
-    return intRes;
-}
-int parseInt(char test[])
-{
-    int intRes;
-    intRes = atol(test);
-    return intRes;
-}
-
 // Binary int format in c is 0b00000000000000000000000000000000 (32 bits)
 
 char **mySplit(char *str)
@@ -169,7 +140,6 @@ char **mySplit(char *str)
     return storeSplit;
 }
 
-
 void freeSplit(char **split, int numTokens)
 {
     for (int i = 0; i < numTokens; i++)
@@ -179,123 +149,65 @@ void freeSplit(char **split, int numTokens)
     free(split);
 }
 
-void parse()
+int parse()
 {
-    // char fileName[] = "MIPS.txt";
+    char fileName[] = "MIPS.txt";
     FILE *input;
     // Open a file in read mode
+    input = fopen("filename.txt", "r");
     char instruction[100];
     int instructionType;
-    int registerSource;
-    int registerDest;
-    int registerTarget;
-    int imm;
-    int address;
-    int shamt;
-    char instType;
-    
-   
-    input = fopen("filename.txt", "r");
-    int c = 0;
     while (fgets(instruction, 100, input))
-    {   
-        char **instructionSplitted = mySplit(instruction);
+    {
+        char **split = mySplit(instruction);
         // what to do with first line
-        if (strcmp(instructionSplitted[0], "ADD") == 0)
+        for (int i = 0; i < strlen(instruction); i++)
         {
-            instructionType = 0b00000000000000000000000000000000;
-            instType = 'R';
-        }
-        else if (strcmp(instructionSplitted[0], "SUB") == 0)
-        {
-            instructionType = 0b00010000000000000000000000000000;
-            instType = 'R';
-        }
-        else if (strcmp(instructionSplitted[0], "MULI") == 0)
-        {
-            instructionType = 0b00100000000000000000000000000000;
-            instType = 'I';
-        }
-        else if (strcmp(instructionSplitted[0], "ADDI") == 0)
-        {
-            instructionType = 0b00110000000000000000000000000000;
-            instType = 'I';
-        }
-        else if (strcmp(instructionSplitted[0], "BNE") == 0)
-        {
-            instructionType = 0b01000000000000000000000000000000;
-            instType = 'I';
-        }
-        else if (strcmp(instructionSplitted[0], "ANDI") == 0)
-        {
-            instructionType = 0b01010000000000000000000000000000;
-            instType = 'I';
-        }
-        else if (strcmp(instructionSplitted[0], "ORI") == 0)
-        {
-            instructionType = 0b01100000000000000000000000000000;
-            instType = 'I';
-        }
-        else if (strcmp(instructionSplitted[0], "J") == 0)
-        {
-            instructionType = 0b01110000000000000000000000000000;
-            instType = 'J';
-        }
-        else if (strcmp(instructionSplitted[0], "SLL") == 0)
-        {
-            instructionType = 0b10000000000000000000000000000000;
-            instType = 'R';
-        }
-        else if (strcmp(instructionSplitted[0], "SRL") == 0)
-        {
-            instructionType = 0b10010000000000000000000000000000;
-            instType = 'R';
-        }
-        else if (strcmp(instructionSplitted[0], "LW") == 0)
-        {
-            instructionType = 0b10100000000000000000000000000000;
-            instType = 'I';
-        }
-        else if (strcmp(instructionSplitted[0], "SW") == 0)
-        {
-            instructionType = 0b10110000000000000000000000000000;
-            instType = 'I';
-        }
-        else
-        {
-            continue;
-        }
-        int R1;
-        int R2;
-        int R3 = 0;
-        int shamt = 0;
-        int imm;
-        switch (instType)
-        {
-        case 'R':
-            R1 = parseRegNum(instructionSplitted[1]);
-            R2 = parseRegNum(instructionSplitted[2]);
-            if (strcmp(instructionSplitted[0], "ADD") || strcmp(instructionSplitted[0], "SUB"))
-                R3 = parseRegNum(instructionSplitted[3]);
-            else
-                shamt = parseRegNum(instructionSplitted[3]);
-            instructionType = instructionType | R1 << 23 | R2 << 18 | R3 << 13 | shamt;
-            break;
-        case 'I':
-            R1 = parseRegNum(instructionSplitted[1]);
-            R2 = parseRegNum(instructionSplitted[2]);
-            imm = parseInt(instructionSplitted[3]);
-            instructionType = instructionType | R1 << 23 | R2 << 18 | imm;
 
-            break;
-        case 'J':
-            address = parseInt(instructionSplitted[1]);
-            instructionType = instructionType | address;
-            break;
+            switch (instruction[0])
+            {
+
+            case 'ADD':
+                instructionType = 0b0000;
+                break;
+            case 'SUB':
+                instructionType = 0b0001;
+                break;
+            case 'MULI':
+                instructionType = 0b0010;
+                break;
+            case 'ADDI':
+                instructionType = 0b0011;
+                break;
+            case 'BNE':
+                instructionType = 0b0100;
+                break;
+            case 'ANDI':
+                instructionType = 0b0101;
+                break ;
+            case 'ORI':
+                instructionType = 0b0110;
+                break;
+            case 'J':
+                instructionType = 0b0111;
+                break;
+            case 'SLL':
+                instructionType = 0b1000;
+                break;
+            case 'SRL':
+                instructionType = 0b1001;
+                break;
+            case 'LW':
+                instructionType = 0b1010;
+                break;
+            case 'SW':
+                instructionType = 0b1011;
+                break;
+            };
         }
-        mainMemory.mainMemory[c++]=instructionType;
     }
-    fclose(input);
+
+    char operation[5];
 }
 
 int fetch()
@@ -309,39 +221,25 @@ int fetch()
 }
 
 void decode1(int instruction)
-
 {
+
     decodedValues.opcode = (instruction & 0b11110000000000000000000000000000) >> 28;
-    registerFile.regWrite = (instruction & 0b00001111100000000000000000000000) >> 23;
-    registerFile.readReg1 = (instruction & 0b00000000011111000000000000000000) >> 18;
-    registerFile.readReg2 = (instruction & 0b00000000000000111110000000000000) >> 13;
+    decodedValues.r1 = (instruction & 0b00001111100000000000000000000000) >> 23;
+    decodedValues.r2 = (instruction & 0b00000000011111000000000000000000) >> 18;
+    decodedValues.r3 = (instruction & 0b00000000000000111110000000000000) >> 13;
     decodedValues.shamt = (instruction & 0b00000000000000000001111111111111);
     decodedValues.imm = (instruction & 0b00000000000000111111111111111111);
     decodedValues.address = (instruction & 0b00001111111111111111111111111111);
 }
-void decode2(int instruction)
-{
-    registerFile.readData1=(registerFile.registerArray[registerFile.readReg1]);
-    
-}
-
 
 void controlUnitSignals(int opcode)
 {
     CU.memRead = opcode == 10;
     CU.memWrite = opcode == 5;
-    CU.ALUsrc = opcode == 2 || opcode == 3 || opcode== 4|| opcode == 5 || opcode == 6 || opcode == 10 || opcode == 11;
+    CU.ALUSrc = opcode == 2 || opcode == 3 || opcode == 5 || opcode == 6 || opcode == 9 || opcode == 10;
     CU.regWrite = opcode == 0 || opcode == 1 || opcode == 2 || opcode == 3 || opcode == 5 || opcode == 6 || opcode == 8 || opcode == 9 || opcode == 10;
-<<<<<<< HEAD
     CU.memtoReg = opcode == 11;
     CU.jump= opcode == 7;
-=======
-    CU.memToReg = opcode == 10;
-    CU.branch= opcode==4;
-    CU.regDst= opcode==0 || opcode==1 || opcode==8 || opcode==9;
-
-
->>>>>>> 2030415a3f7f295cb7f3534d7b4f4880d3f51f47
 
 }
 
@@ -502,9 +400,8 @@ void exec()
 
 }
 
-int checkControlHazard(int instruction)
+int main()
 {
-<<<<<<< HEAD
     int instructionTest;
 
 
@@ -520,28 +417,6 @@ int checkControlHazard(int instruction)
     printf("%d", registerFile.registerArray[32].regValue);
     fetch(registerFile);
     printf("%d", registerFile.registerArray[32].regValue);
-=======
-    int opCode = instruction >> 28;
-    if (opCode == 0b0101 || opCode == 0b0111)
-    {
-        return 1;
-    }
-    return 0;
-}
-
-int main()
-{
-
-    registerFile.registerArray = registerInit(32);
-    // printf("%d", registerFile.registerArray[32].regValue);
-    // // fetch(registerFile);
-    // printf("%d", registerFile.registerArray[32].regValue);
-    parse();
-    printf("%d\n", mainMemory.mainMemory[0]);
-    printf("%d\n", mainMemory.mainMemory[1]);
-    printf("%d\n", mainMemory.mainMemory[2]);
-
->>>>>>> 2030415a3f7f295cb7f3534d7b4f4880d3f51f47
     return 0;
 }
 
