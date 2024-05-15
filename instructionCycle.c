@@ -18,9 +18,7 @@ typedef struct
 typedef struct
 {
     Register *registerArray;
-    int regWrite;
-    int readReg1;
-    int readReg2;
+    int regWrite;    
 } RegisterFile;
 
 typedef struct
@@ -72,13 +70,13 @@ typedef struct
 typedef struct
 {
     int ALUoutput;  
-    int zeroFlag; 
+    // int zeroFlag; 
     int reg1;    // number of reg 1 that will be the destination
     int reg3;    // value of reg3
-    int branchAddition;
+    // int branchAddition;
     
-    int branch;  // control signals (needed for memory access phase)
-    int jump;    // control signals (needed for memory access phase)
+    // int branch;  // control signals (needed for memory access phase)
+    // int jump;    // control signals (needed for memory access phase)
     int memRead; // control signals (needed for memory access phase)
     int memWrite;// control signals (needed for memory access phase)
     
@@ -88,8 +86,8 @@ typedef struct
 
 typedef struct 
 {
-    int ALUoutput;
-    int readData;
+    int ALUoutput; //this or the below will be written in the regFile
+    int readData; //this or the above will be written in the regFile
     int reg1;  // number of reg 1 that will be the destination
 
     int memtoReg;// control signals (needed for write back phase)
@@ -109,27 +107,15 @@ ID_EX ID_EX_regFile;
 EX_MEM EX_MEM_regFile;
 MEM_WB MEM_WB_regFile;
 
-// will use Flag to know whether an instruction is valid fe kol pipeline stage
-int instructionValid[3] = {1, 1, 1}; // 1st index->Fetch, 2nd->Decode,3rd-> Execute
 
-
-void flushPipeline() {
-    //queue inside it in that order {instruction7,instruction6, instruction5, instruction4,instruction3, instruction2, instruction1}
-    instructionValid[0] = 0; // Flush fetch
-    instructionValid[1] = 0; // Flush decode
+void flushPipeline() {  
+    memset(&IF_ID_regFile,0,sizeof(IF_ID_regFile));
+    //memset betakhod ptr (el block el ha fill),value (el ha fill beeh el block),
+    //number of bytes to be set to the value
+    memset(&ID_EX_regFile,0,sizeof(ID_EX_regFile));
 }
 
-int checkControlHazard(int instruction)
-{
-    int opCode = instruction >> 28;
-    if (opCode == 0b0101 || opCode == 0b0111)
-    {
-        // PC.regValue = decodedValues.address; // Update PC bl calculated branch address
-        flushPipeline(); // Flush instructions in decode and fetch stages
-        return 1;
-    }
-    return 0;
-}
+
 
 Register *registerInit(int regCount)
 {
@@ -258,9 +244,6 @@ int parse()
 
 void fetch()
 {
-    if (!instructionValid[0]){
-        return -1;
-    }
     int instruction = mainMemory.mainMemory[PC.regValue];
     PC.regValue++;
     IF_ID_regFile.IR=instruction;
@@ -342,18 +325,16 @@ ALUOutput ALU(int operandA, int operandB, int operation)
   
 }
 
-int memAccess(){
+int memAccess()
+{
     if(EX_MEM_regFile.memRead==1) 
         MEM_WB_regFile.readData=mainMemory.mainMemory[EX_MEM_regFile.ALUoutput];
     else if (EX_MEM_regFile.memWrite==1)
         mainMemory.mainMemory[EX_MEM_regFile.ALUoutput]=EX_MEM_regFile.reg3; //here I used the third register but this is because I assumed a fixed architecture where I saved the value of R1 in R3 in the reg file
-    else if (EX_MEM_regFile.jump==1|| (EX_MEM_regFile.branch==1 && EX_MEM_regFile.zeroFlag!=1))
-        PC.regValue= EX_MEM_regFile.branchAddition;
     MEM_WB_regFile.ALUoutput=EX_MEM_regFile.ALUoutput;
     MEM_WB_regFile.memtoReg= EX_MEM_regFile.memtoReg;
     MEM_WB_regFile.reg1=EX_MEM_regFile.reg1;
     MEM_WB_regFile.regWrite=EX_MEM_regFile.regWrite;
-
 }
 
 int writeBack(){
@@ -369,86 +350,65 @@ int writeBack(){
 
 void exec()
 {
-    // if (!instructionValid[2])
-    //     return;
-    // if (decodedValues.opcode == 0b0101 || decodedValues.opcode == 0b0111){
-    //     flushPipeline();
-    //     PC.regValue = decodedValues.address; // Update el PC w flush pipeline
-    //     instructionValid[0]=1;
-    //     instructionValid[1]=1;
-    //     instructionValid[2]=1; //aizeen neraga3 el validity of f/d/e ba3d el branching
-    // }
     int opCode = ID_EX_regFile.opcode;
-    int operandA;
+    int operandA=ID_EX_regFile.reg2;
     int operandB;
     int zeroFlag;
     //when checking with the group, the rhs should come from ID_EX_regFile and the lhs from EX_MEM_regFile
     switch (opCode)
     {
         case 0: // ADD
-            operandA = ID_EX_regFile.reg2;
             operandB = ID_EX_regFile.reg3;
             EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,0).result;
             break;
         case 1: // SUB
-            operandA = ID_EX_regFile.reg2;
             operandB = ID_EX_regFile.reg3;
             EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,1).result;
             break;
         case 2: // MULI
-            operandA = ID_EX_regFile.reg2;
             operandB = ID_EX_regFile.reg3;
             EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,2).result;
             break;
         case 3: // ADDI
-            operandA = ID_EX_regFile.reg2;
             operandB = ID_EX_regFile.imm;
             EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,0).result;
             break;
         case 4: // BNE
-            operandA = ID_EX_regFile.reg3; // value of reg1 is inside this reg
-            operandB = ID_EX_regFile.reg2;
+            operandB = ID_EX_regFile.reg3; // value of reg1 is inside this reg
             ALUOutput out= ALU(operandA,operandB,1);
-            EX_MEM_regFile.branchAddition=out.result;
-            EX_MEM_regFile.zeroFlag=out.zeroflag;
+            if (ID_EX_regFile.branch==1 && out.zeroflag != 1)
+                PC.regValue= ID_EX_regFile.PC + out.result;
             break;
         case 5: // ANDI
-            operandA = ID_EX_regFile.reg2;
             operandB = ID_EX_regFile.imm;
             EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,3).result;
             break;
         case 6: // ORI
-            operandA = ID_EX_regFile.reg2;
             operandB = ID_EX_regFile.imm;
             EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,4).result;
             break;
         case 7: //J
-            EX_MEM_regFile.branchAddition=(ID_EX_regFile.PC & 0b11110000000000000000000000000000 )|| ID_EX_regFile.address;
+            if (ID_EX_regFile.jump==1)
+                PC.regValue=(ID_EX_regFile.PC & 0b11110000000000000000000000000000 ) | ID_EX_regFile.address;
             break;
         case 8: //SLL
-            operandA = ID_EX_regFile.reg2;
             operandB = ID_EX_regFile.shamt;
             EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,5).result;
             break;
         case 9: //SRL
-            operandA = ID_EX_regFile.reg2;
             operandB = ID_EX_regFile.shamt;
             EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,6).result;
             break;
         case 10://LW  
-            operandA = ID_EX_regFile.reg2;
             operandB = ID_EX_regFile.imm;
             EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,0).result;
             break;
         case 11: //SW
-            operandA = ID_EX_regFile.reg2;
             operandB = ID_EX_regFile.imm;
             EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,0).result;
             break;
     }
     EX_MEM_regFile.reg1 = ID_EX_regFile.reg1;
-    EX_MEM_regFile.branch = ID_EX_regFile.branch;
-    EX_MEM_regFile.jump = ID_EX_regFile.jump;
     EX_MEM_regFile.memRead = ID_EX_regFile.memRead;
     EX_MEM_regFile.memWrite = ID_EX_regFile.memWrite;
     EX_MEM_regFile.memtoReg = ID_EX_regFile.memtoReg;
