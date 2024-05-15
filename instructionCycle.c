@@ -25,6 +25,12 @@ typedef struct
 
 typedef struct
 {
+    int result;
+    int zeroflag;
+}ALUOutput;
+
+typedef struct
+{
     int branch;
     int memRead;
     int memWrite;
@@ -34,34 +40,74 @@ typedef struct
     int jump;
 } ControlUnit;
 
-typedef struct
+typedef struct 
 {
-    int opcode;
-    int r1;
-    int r2;
-    int r3;
-    int shamt;
-    int imm;
-    int address;
-} DecodedValues;
+    int PC;
+    int IR;
+}IF_ID;
 
 typedef struct
 {
-    int result;
-    int zeroflag;
-}ALUOutput;
+    int reg1;    // number of reg 1 that will be the destination
+    int reg2;    // value of reg 2
+    int reg3;    // value of reg3
+    int opcode;  // needed for execution
+    int address; // needed for J-format
+    int imm;     // needed for I-format
+    int shamt;   // shift amount in R-format
+    int PC;      // save PC value in this reg file since it'll be overwritten in the next cycle while pipelining
+   
+    int ALUSrc;  // control signals (needed in execution phase)
+   
+    int branch;  // control signals (needed for memory access phase)
+    int jump;    // control signals (needed for memory access phase)
+    int memRead; // control signals (needed for memory access phase)
+    int memWrite;// control signals (needed for memory access phase)
+    
+    int memtoReg;// control signals (needed for write back phase)
+    int regWrite;// control signals (needed for write back phase)
+
+}ID_EX;
+
+typedef struct
+{
+    int ALUoutput;  
+    int zeroFlag; 
+    int reg1;    // number of reg 1 that will be the destination
+    int reg3;    // value of reg3
+    int branchAddition;
+    
+    int branch;  // control signals (needed for memory access phase)
+    int jump;    // control signals (needed for memory access phase)
+    int memRead; // control signals (needed for memory access phase)
+    int memWrite;// control signals (needed for memory access phase)
+    
+    int memtoReg;// control signals (needed for write back phase)
+    int regWrite;// control signals (needed for write back phase)
+}EX_MEM;
+
+typedef struct 
+{
+    int ALUoutput;
+    int readData;
+    int reg1;  // number of reg 1 that will be the destination
+
+    int memtoReg;// control signals (needed for write back phase)
+    int regWrite;// control signals (needed for write back phase)
+}MEM_WB;
+
+
 
 // Global Initialisation
 MainMemory mainMemory;
 RegisterFile registerFile;
 Register PC = {"PC", 0};
-DecodedValues decodedValues;
 ControlUnit CU;
-ALUOutput ALUoutput;
-int MDR;
-int zeroFlag = 0;
-int* dest;
-int writeBackVal;
+
+IF_ID IF_ID_regFile;
+ID_EX ID_EX_regFile;
+EX_MEM EX_MEM_regFile;
+MEM_WB MEM_WB_regFile;
 
 // will use Flag to know whether an instruction is valid fe kol pipeline stage
 int instructionValid[3] = {1, 1, 1}; // 1st index->Fetch, 2nd->Decode,3rd-> Execute
@@ -69,8 +115,8 @@ int instructionValid[3] = {1, 1, 1}; // 1st index->Fetch, 2nd->Decode,3rd-> Exec
 
 void flushPipeline() {
     //queue inside it in that order {instruction7,instruction6, instruction5, instruction4,instruction3, instruction2, instruction1}
-    instructionValid[0] = 0; // Flush fetch 
-    instructionValid[1] = 0; // Flush decode 
+    instructionValid[0] = 0; // Flush fetch
+    instructionValid[1] = 0; // Flush decode
 }
 
 int checkControlHazard(int instruction)
@@ -78,7 +124,7 @@ int checkControlHazard(int instruction)
     int opCode = instruction >> 28;
     if (opCode == 0b0101 || opCode == 0b0111)
     {
-        PC.regValue = decodedValues.address; // Update PC bl calculated branch address
+        // PC.regValue = decodedValues.address; // Update PC bl calculated branch address
         flushPipeline(); // Flush instructions in decode and fetch stages
         return 1;
     }
@@ -210,40 +256,58 @@ int parse()
     char operation[5];
 }
 
-int fetch()
+void fetch()
 {
-    if (!instructionValid[0]){ 
+    if (!instructionValid[0]){
         return -1;
     }
     int instruction = mainMemory.mainMemory[PC.regValue];
     PC.regValue++;
-    return instruction;
+    IF_ID_regFile.IR=instruction;
+    IF_ID_regFile.PC=PC.regValue;
 }
 
-void decode1(int instruction)
+void decode()
 {
+    int instruction = IF_ID_regFile.IR;
+    ID_EX_regFile.opcode = (instruction & 0b11110000000000000000000000000000) >> 28;
+    ID_EX_regFile.reg1 = (instruction & 0b00001111100000000000000000000000) >> 23;
+    int reg2Num = (instruction & 0b00000000011111000000000000000000) >> 18;
+    int reg3Num = (instruction & 0b00000000000000111110000000000000) >> 13;
+    ID_EX_regFile.shamt = (instruction & 0b00000000000000000001111111111111);
+    ID_EX_regFile.imm = (instruction & 0b00000000000000111111111111111111);
+    ID_EX_regFile.address = (instruction & 0b00001111111111111111111111111111);
 
-    decodedValues.opcode = (instruction & 0b11110000000000000000000000000000) >> 28;
-    decodedValues.r1 = (instruction & 0b00001111100000000000000000000000) >> 23;
-    decodedValues.r2 = (instruction & 0b00000000011111000000000000000000) >> 18;
-    decodedValues.r3 = (instruction & 0b00000000000000111110000000000000) >> 13;
-    decodedValues.shamt = (instruction & 0b00000000000000000001111111111111);
-    decodedValues.imm = (instruction & 0b00000000000000111111111111111111);
-    decodedValues.address = (instruction & 0b00001111111111111111111111111111);
+    int opcode=ID_EX_regFile.opcode;
+
+    ID_EX_regFile.reg2=registerFile.registerArray[reg2Num].regValue; // reads any operands required from the register file
+    ID_EX_regFile.reg3= (opcode==4||opcode==11)? registerFile.registerArray[ID_EX_regFile.reg1].regValue :registerFile.registerArray[reg3Num].regValue; // reads any operands required from the register file
+    ID_EX_regFile.PC=IF_ID_regFile.PC; //For pipelining; in case we needed PC value in BNE instruction in the execution phase
+
+    controlUnitSignals(ID_EX_regFile.opcode);
+    ID_EX_regFile.ALUSrc=CU.ALUSrc;
+    ID_EX_regFile.branch=CU.branch;
+    ID_EX_regFile.jump=CU.jump;
+    ID_EX_regFile.memRead=CU.memRead;
+    ID_EX_regFile.memWrite=CU.memWrite;
+    ID_EX_regFile.memtoReg=CU.memtoReg;
+    ID_EX_regFile.regWrite=CU.regWrite;
+
 }
 
 void controlUnitSignals(int opcode)
 {
     CU.memRead = opcode == 10;
-    CU.memWrite = opcode == 5;
+    CU.memWrite = opcode == 11;
     CU.ALUSrc = opcode == 2 || opcode == 3 || opcode == 5 || opcode == 6 || opcode == 9 || opcode == 10;
     CU.regWrite = opcode == 0 || opcode == 1 || opcode == 2 || opcode == 3 || opcode == 5 || opcode == 6 || opcode == 8 || opcode == 9 || opcode == 10;
-    CU.memtoReg = opcode == 11;
+    CU.memtoReg = opcode == 10;
+    CU.branch = opcode == 4;
     CU.jump= opcode == 7;
 
 }
 
-void ALU(int operandA, int operandB, int operation)
+ALUOutput ALU(int operandA, int operandB, int operation)
 {
     int output = 0;
     switch (operation)
@@ -270,133 +334,125 @@ void ALU(int operandA, int operandB, int operation)
             output = operandA >> operandB;
             break;
     }
-    ALUoutput.result = output;
-    ALUoutput.zeroflag = (output == 0);
+
+    ALUOutput outputStruct;
+    outputStruct.result = output;
+    outputStruct.zeroflag = (output == 0);
+    return outputStruct;
+  
 }
 
 int memAccess(){
-   if(CU.memRead==1){
-        MDR=mainMemory.mainMemory[writeBackVal];
-    }
+    if(EX_MEM_regFile.memRead==1) 
+        MEM_WB_regFile.readData=mainMemory.mainMemory[EX_MEM_regFile.ALUoutput];
+    else if (EX_MEM_regFile.memWrite==1)
+        mainMemory.mainMemory[EX_MEM_regFile.ALUoutput]=EX_MEM_regFile.reg3; //here I used the third register but this is because I assumed a fixed architecture where I saved the value of R1 in R3 in the reg file
+    else if (EX_MEM_regFile.jump==1|| (EX_MEM_regFile.branch==1 && EX_MEM_regFile.zeroFlag!=1))
+        PC.regValue= EX_MEM_regFile.branchAddition;
+    MEM_WB_regFile.ALUoutput=EX_MEM_regFile.ALUoutput;
+    MEM_WB_regFile.memtoReg= EX_MEM_regFile.memtoReg;
+    MEM_WB_regFile.reg1=EX_MEM_regFile.reg1;
+    MEM_WB_regFile.regWrite=EX_MEM_regFile.regWrite;
+
 }
 
-int writeBack(int address, int regNum){
-    if(dest){
-        if (CU.memWrite==1){
-            mainMemory.mainMemory[*dest]= writeBackVal;
+int writeBack(){
+        if (MEM_WB_regFile.regWrite==1){
+            if (MEM_WB_regFile.memtoReg==0)
+                registerFile.registerArray[MEM_WB_regFile.reg1].regValue=MEM_WB_regFile.ALUoutput;
+            else
+                registerFile.registerArray[MEM_WB_regFile.reg1].regValue=MEM_WB_regFile.readData;
         }
-        else if(CU.memtoReg==1){
-            *dest = MDR;
-        }
-        else if (CU.regWrite==1 || CU.branch==1 || CU.jump == 1){ 
-            *dest=writeBackVal;
-        }
-    }
+    
 }
 
 
 void exec()
 {
-    if (!instructionValid[2]) 
-        return; 
-    if (decodedValues.opcode == 0b0101 || decodedValues.opcode == 0b0111){ 
-        flushPipeline(); 
-        PC.regValue = decodedValues.address; // Update el PC w flush pipeline
-        instructionValid[0]=1;
-        instructionValid[1]=1;
-        instructionValid[2]=1; //aizeen neraga3 el validity of f/d/e ba3d el branching
-    }
-    int opCode = decodedValues.opcode;
+    // if (!instructionValid[2])
+    //     return;
+    // if (decodedValues.opcode == 0b0101 || decodedValues.opcode == 0b0111){
+    //     flushPipeline();
+    //     PC.regValue = decodedValues.address; // Update el PC w flush pipeline
+    //     instructionValid[0]=1;
+    //     instructionValid[1]=1;
+    //     instructionValid[2]=1; //aizeen neraga3 el validity of f/d/e ba3d el branching
+    // }
+    int opCode = ID_EX_regFile.opcode;
     int operandA;
     int operandB;
     int zeroFlag;
+    //when checking with the group, the rhs should come from ID_EX_regFile and the lhs from EX_MEM_regFile
     switch (opCode)
     {
         case 0: // ADD
-            operandA = registerFile.registerArray[decodedValues.r2].regValue;
-            operandB = registerFile.registerArray[decodedValues.r3].regValue;
-            dest = &registerFile.registerArray[decodedValues.r1].regValue;
-            ALU(operandA,operandB,0);
-            writeBackVal=ALUoutput.result;
+            operandA = ID_EX_regFile.reg2;
+            operandB = ID_EX_regFile.reg3;
+            EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,0).result;
             break;
         case 1: // SUB
-            operandA = registerFile.registerArray[decodedValues.r2].regValue;
-            operandB = registerFile.registerArray[decodedValues.r3].regValue;
-            dest = &registerFile.registerArray[decodedValues.r1].regValue;
-            ALU(operandA,operandB,1);
-            writeBackVal=ALUoutput.result;
+            operandA = ID_EX_regFile.reg2;
+            operandB = ID_EX_regFile.reg3;
+            EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,1).result;
             break;
         case 2: // MULI
-            operandA = registerFile.registerArray[decodedValues.r2].regValue;
-            operandB = decodedValues.imm;
-            dest = &registerFile.registerArray[decodedValues.r1].regValue;
-            ALU(operandA,operandB,2);
-            writeBackVal=ALUoutput.result;
+            operandA = ID_EX_regFile.reg2;
+            operandB = ID_EX_regFile.reg3;
+            EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,2).result;
             break;
         case 3: // ADDI
-            operandA = registerFile.registerArray[decodedValues.r2].regValue;
-            operandB = decodedValues.imm;
-            dest = &registerFile.registerArray[decodedValues.r1].regValue;
-            ALU(operandA,operandB,0);
-            writeBackVal=ALUoutput.result;
+            operandA = ID_EX_regFile.reg2;
+            operandB = ID_EX_regFile.imm;
+            EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,0).result;
             break;
         case 4: // BNE
-            operandA = registerFile.registerArray[decodedValues.r1].regValue;
-            operandB = registerFile.registerArray[decodedValues.r2].regValue;
-            ALU(operandA,operandB,1);
-            if(!ALUoutput.zeroflag){
-                CU.branch=1;
-                dest =&PC.regValue;
-                writeBackVal=decodedValues.imm;
-            }
+            operandA = ID_EX_regFile.reg3; // value of reg1 is inside this reg
+            operandB = ID_EX_regFile.reg2;
+            ALUOutput out= ALU(operandA,operandB,1);
+            EX_MEM_regFile.branchAddition=out.result;
+            EX_MEM_regFile.zeroFlag=out.zeroflag;
             break;
         case 5: // ANDI
-            operandA = registerFile.registerArray[decodedValues.r2].regValue;
-            operandB = decodedValues.imm;
-            dest = &registerFile.registerArray[decodedValues.r1].regValue;
-            ALU(operandA,operandB,3);
-            writeBackVal=ALUoutput.result;
+            operandA = ID_EX_regFile.reg2;
+            operandB = ID_EX_regFile.imm;
+            EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,3).result;
             break;
         case 6: // ORI
-            operandA = registerFile.registerArray[decodedValues.r2].regValue;
-            operandB = decodedValues.imm;
-            dest = &registerFile.registerArray[decodedValues.r1].regValue;
-            ALU(operandA,operandB,4);
-            writeBackVal=ALUoutput.result;
+            operandA = ID_EX_regFile.reg2;
+            operandB = ID_EX_regFile.imm;
+            EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,4).result;
             break;
         case 7: //J
-            dest = &PC.regValue;
-            writeBackVal= (PC.regValue & 0b11110000000000000000000000000000 )|| decodedValues.address;
+            EX_MEM_regFile.branchAddition=(ID_EX_regFile.PC & 0b11110000000000000000000000000000 )|| ID_EX_regFile.address;
             break;
         case 8: //SLL
-            operandA = registerFile.registerArray[decodedValues.r2].regValue;
-            operandB = decodedValues.shamt;
-            dest = &registerFile.registerArray[decodedValues.r1].regValue;
-            ALU(operandA,operandB,5);
-            writeBackVal=ALUoutput.result;
+            operandA = ID_EX_regFile.reg2;
+            operandB = ID_EX_regFile.shamt;
+            EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,5).result;
             break;
         case 9: //SRL
-            operandA = registerFile.registerArray[decodedValues.r2].regValue;
-            operandB = decodedValues.shamt;
-            dest = &registerFile.registerArray[decodedValues.r1].regValue;
-            ALU(operandA,operandB,6);
-            writeBackVal=ALUoutput.result;
+            operandA = ID_EX_regFile.reg2;
+            operandB = ID_EX_regFile.shamt;
+            EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,6).result;
             break;
-        case 10://LW  ()
-            operandA = registerFile.registerArray[decodedValues.r2].regValue;
-            operandB = decodedValues.imm;
-            dest = &registerFile.registerArray[decodedValues.r1].regValue;
-            ALU(operandA,operandB,0);
-            writeBackVal=&ALUoutput.result;
+        case 10://LW  
+            operandA = ID_EX_regFile.reg2;
+            operandB = ID_EX_regFile.imm;
+            EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,0).result;
             break;
         case 11: //SW
-            operandA = registerFile.registerArray[decodedValues.r2].regValue;
-            operandB = decodedValues.imm;
-            ALU(operandA,operandB,0);
-            dest = &ALUoutput.result; //get index
-            writeBackVal=registerFile.registerArray[decodedValues.r1].regValue;
+            operandA = ID_EX_regFile.reg2;
+            operandB = ID_EX_regFile.imm;
+            EX_MEM_regFile.ALUoutput=ALU(operandA,operandB,0).result;
             break;
     }
+    EX_MEM_regFile.reg1 = ID_EX_regFile.reg1;
+    EX_MEM_regFile.branch = ID_EX_regFile.branch;
+    EX_MEM_regFile.jump = ID_EX_regFile.jump;
+    EX_MEM_regFile.memRead = ID_EX_regFile.memRead;
+    EX_MEM_regFile.memWrite = ID_EX_regFile.memWrite;
+    EX_MEM_regFile.memtoReg = ID_EX_regFile.memtoReg;
+    EX_MEM_regFile.regWrite = ID_EX_regFile.regWrite; // check that these signals are initialized somewhere
 
 }
 
