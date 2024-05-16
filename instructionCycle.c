@@ -309,7 +309,8 @@ void parse()
                 R1 = parseRegNum(instructionSplitted[1]);
                 R2 = parseRegNum(instructionSplitted[2]);
                 imm = parseInt(instructionSplitted[3]);
-                instructionType = instructionType | R1 << 23 | R2 << 18 | imm;
+                int immNegative = 0b00000000000000111111111111111111 & imm;
+                instructionType = instructionType | R1 << 23 | R2 << 18 | immNegative;
                 break;
             case 'J':
                 address = parseInt(instructionSplitted[1]);
@@ -724,7 +725,7 @@ void exec()
         EX_MEM_regFile.regWrite = ID_EX_regFile.regWrite; // check that these signals are initialized somewhere
         EX_MEM_regFile.active = 1;
         EX_MEM_regFile.instNum = ID_EX_regFile.instNum;
-
+        ID_EX_regFile.reg1=0;
 //        printf("memRead Signal: %d \n", EX_MEM_regFile.memRead);
 //        printf("memWrite Signal: %d \n", EX_MEM_regFile.memWrite);
 //        printf("memtoReg Signal: %d \n", EX_MEM_regFile.memtoReg);
