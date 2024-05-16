@@ -2,7 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-
+#define RED   "\x1B[31m"
+#define GRN   "\x1B[32m"
+#define YEL   "\x1B[33m"
+#define BLU   "\x1B[34m"
+#define MAG   "\x1B[35m"
+#define CYN   "\x1B[36m"
+#define WHT   "\x1B[37m"
+#define RESET "\x1B[0m"
 typedef struct
 {
     int mainMemory[2048];
@@ -332,8 +339,8 @@ void fetch()
             fetch_active = 0;
             return;
         }
-        printf("Fetch Stage \n");
-        printf("    Instruction %d is being fetched %b\n", PC.regValue, instruction);
+        printf(BLU"Fetch Stage \n"RESET);
+        printf( BLU"    Instruction %d is being fetched %b\n"RESET ,PC.regValue, instruction);
         IF_ID_regFile.instNum= PC.regValue++;
         if (stallingNeeded){
             PC.regValue--;
@@ -363,7 +370,7 @@ void decode()
 {
     if (IF_ID_regFile.active)
     {
-        printf("Decode Stage \n");
+        printf(GRN "Decode Stage \n");
         IF_ID_regFile.active = 0;
         int instruction = IF_ID_regFile.IR;
         int reg2Addr = (instruction & 0b00000000011111000000000000000000) >> 18;
@@ -411,27 +418,27 @@ void decode()
                 printf("    Opcode: %d\n", opcode);
                 printf("    R1: %d\n", ID_EX_regFile.reg1);
                 printf("    R2: %d\n", ID_EX_regFile.reg2Addr);
-                printf("    R3: %d\n", ID_EX_regFile.reg3Addr);
+                printf("    R3: %d\n" RESET, ID_EX_regFile.reg3Addr);
                 break;
             case 8: case 9:
                 printf("    Type R\n");
                 printf("    Opcode: %d\n", opcode);
                 printf("    R1: %d\n", ID_EX_regFile.reg1);
                 printf("    R2: %d\n", ID_EX_regFile.reg2Addr);
-                printf("    SHAMT: %d\n", ID_EX_regFile.shamt);
+                printf("    SHAMT: %d\n" RESET, ID_EX_regFile.shamt);
                 break;
             case 2: case 3: case 4: case 5: case 6: case 10: case 11:
                 printf("    Type I\n");
                 printf("    Opcode: %d\n", opcode);
                 printf("    R1: %d\n", ID_EX_regFile.reg1);
                 printf("    R2: %d\n", ID_EX_regFile.reg2Addr);
-                printf("    IMM: %d\n", ID_EX_regFile.imm);
+                printf("    IMM: %d\n" RESET, ID_EX_regFile.imm);
                 break;
             case 7:
                 printf("    Type J\n");
                 printf("    Opcode: %d\n", opcode);
                 printf("    R1: %d\n", ID_EX_regFile.reg1);
-                printf("    Address: %d\n",ID_EX_regFile.address);
+                printf("    Address: %d\n" RESET,ID_EX_regFile.address);
                 break;
         }
     }
@@ -475,6 +482,7 @@ void memAccess()
 {
     if (EX_MEM_regFile.active)
     {
+        printf(RED);
         EX_MEM_regFile.active = 0;
         if (EX_MEM_regFile.memRead == 1){
             printf("Memory Access Stage (MA)\n");
@@ -501,6 +509,7 @@ void memAccess()
         MEM_WB_regFile.active = 1;
         MEM_WB_regFile.instNum = EX_MEM_regFile.instNum;
         EX_MEM_regFile.reg1 = 0;
+        printf(RESET);
     }
 }
 
@@ -514,13 +523,13 @@ void writeBack()
         if (MEM_WB_regFile.regWrite == 1)
         {
             if(MEM_WB_regFile.reg1 != 0) {
-                printf("Write Back Stage (WB) for instruction %d\n",MEM_WB_regFile.instNum);
+                printf(CYN"Write Back Stage (WB) for instruction %d\n",MEM_WB_regFile.instNum);
                 if (MEM_WB_regFile.memtoReg == 0)
                     registerFile.registerArray[MEM_WB_regFile.reg1].regValue = MEM_WB_regFile.ALUoutput;
                 else
                     registerFile.registerArray[MEM_WB_regFile.reg1].regValue = MEM_WB_regFile.readData;
             }
-            printf("    Register %s has value of %d \n",registerFile.registerArray[MEM_WB_regFile.reg1].regName,registerFile.registerArray[MEM_WB_regFile.reg1].regValue);
+            printf("    Register %s has value of %d \n"RESET,registerFile.registerArray[MEM_WB_regFile.reg1].regName,registerFile.registerArray[MEM_WB_regFile.reg1].regValue);
         }
 
     }
@@ -573,7 +582,7 @@ void exec()
             operandA = EX_MEM_regFile.ALUoutput;
         int operandB;
         int zeroFlag;
-        printf("Execute Stage \n");
+        printf(MAG"Execute Stage \n");
         printf("    Instruction %d is being executed\n", ID_EX_regFile.instNum);
         // when checking with the group, the rhs should come from ID_EX_regFile and the lhs from EX_MEM_regFile
         EX_MEM_regFile.prevALUOutput= EX_MEM_regFile.ALUoutput;
@@ -716,6 +725,7 @@ void exec()
                 printf("        Result Address: %d\n",EX_MEM_regFile.ALUoutput);
                 break;
         }
+        printf(RESET);
         EX_MEM_regFile.reg1 = ID_EX_regFile.reg1;
         EX_MEM_regFile.reg3 = ID_EX_regFile.reg3;
         EX_MEM_regFile.memRead = ID_EX_regFile.memRead;
@@ -735,12 +745,12 @@ void exec()
 
 void printDecode() {
     if (IF_ID_regFile.active)
-        printf("    Instruction %d started decoding \n",IF_ID_regFile.instNum);
+        printf(GRN"    Instruction %d started decoding \n"RESET,IF_ID_regFile.instNum);
 }
 
 void printExecute() {
     if (ID_EX_regFile.active)
-        printf("    Instruction %d started executing \n",ID_EX_regFile.instNum);
+        printf(MAG"    Instruction %d started executing \n"RESET,ID_EX_regFile.instNum);
 }
 
 int main()
@@ -751,8 +761,8 @@ int main()
     int i = 0;
     while (fetch_active || IF_ID_regFile.active || ID_EX_regFile.active || EX_MEM_regFile.active || MEM_WB_regFile.active)
     {
-        printf("---------------------------\n");
-        printf("Cycle %d:\n", ++i);
+        printf(WHT"---------------------------\n");
+        printf("Cycle %d:\n"RESET, ++i);
         if (i % 2 == 0)
         {
             memAccess(); //it won't work except when active and this triggered by the exec
@@ -774,14 +784,14 @@ int main()
         printf("Register Value: %d\n", registerFile.registerArray[i].regValue);
     }
 
-//    for(int i =0; i < 2048; i++)
-//    {
-//        if(i<1024)
-//            printf("Instruction Address: %d\n", i);
-//        else
-//            printf("Data Address: %d\n", i);
-//        printf("Memory Value: %d\n", mainMemory.mainMemory[i]);
-//    }
+    for(int i =0; i < 2048; i++)
+    {
+        if(i<1024)
+            printf("Instruction Address: %d\n", i);
+        else
+            printf("Data Address: %d\n", i);
+        printf("Memory Value: %d\n", mainMemory.mainMemory[i]);
+    }
     printf("Memory Value: %d\n", mainMemory.mainMemory[1024]);
     printf("End of Program\n");
 
