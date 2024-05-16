@@ -114,6 +114,8 @@ ID_EX ID_EX_regFile;
 EX_MEM EX_MEM_regFile;
 MEM_WB MEM_WB_regFile;
 int fetch_active = 1;
+bool stallingNeeded = 0;
+
 
 Register *registerInit(int regCount)
 {
@@ -285,26 +287,26 @@ void parse()
         int imm;
         switch (instType)
         {
-        case 'R':
-            R1 = parseRegNum(instructionSplitted[1]);
-            R2 = parseRegNum(instructionSplitted[2]);
-            if (strcmp(instructionSplitted[0], "ADD") || strcmp(instructionSplitted[0], "SUB"))
-                R3 = parseRegNum(instructionSplitted[3]);
-            else
-                shamt = parseRegNum(instructionSplitted[3]);
-            instructionType = instructionType | R1 << 23 | R2 << 18 | R3 << 13 | shamt;
-            break;
-        case 'I':
-            R1 = parseRegNum(instructionSplitted[1]);
-            R2 = parseRegNum(instructionSplitted[2]);
-            imm = parseInt(instructionSplitted[3]);
-            instructionType = instructionType | R1 << 23 | R2 << 18 | imm;
+            case 'R':
+                R1 = parseRegNum(instructionSplitted[1]);
+                R2 = parseRegNum(instructionSplitted[2]);
+                if (strcmp(instructionSplitted[0], "ADD") || strcmp(instructionSplitted[0], "SUB"))
+                    R3 = parseRegNum(instructionSplitted[3]);
+                else
+                    shamt = parseRegNum(instructionSplitted[3]);
+                instructionType = instructionType | R1 << 23 | R2 << 18 | R3 << 13 | shamt;
+                break;
+            case 'I':
+                R1 = parseRegNum(instructionSplitted[1]);
+                R2 = parseRegNum(instructionSplitted[2]);
+                imm = parseInt(instructionSplitted[3]);
+                instructionType = instructionType | R1 << 23 | R2 << 18 | imm;
 
-            break;
-        case 'J':
-            address = parseInt(instructionSplitted[1]);
-            instructionType = instructionType | address;
-            break;
+                break;
+            case 'J':
+                address = parseInt(instructionSplitted[1]);
+                instructionType = instructionType | address;
+                break;
         }
         mainMemory.mainMemory[c++] = instructionType;
     }
@@ -321,12 +323,22 @@ void fetch()
             fetch_active = 0;
             return;
         }
+        printf("Fetch Stage \n");
+        printf("    Instruction %d is being fetched: %b\n", PC.regValue, instruction);
         PC.regValue++;
-        IF_ID_regFile.IR = instruction;
-        IF_ID_regFile.PC = PC.regValue;
-        IF_ID_regFile.active = true;
-        printf("Fetched instruction: %d\n", instruction);
-        printf("---------------------------\n");
+        if (stallingNeeded){
+            PC.regValue--;
+            stallingNeeded=false;
+            IF_ID_regFile.active = 0;
+
+        }
+        else {
+            IF_ID_regFile.active = true;
+            IF_ID_regFile.IR = instruction;
+            IF_ID_regFile.PC = PC.regValue;
+        }
+
+
     }
 }
 
@@ -345,34 +357,73 @@ void decode()
 {
     if (IF_ID_regFile.active)
     {
+        printf("Decode Stage \n");
         IF_ID_regFile.active = 0;
         int instruction = IF_ID_regFile.IR;
+        int reg2Addr = (instruction & 0b00000000011111000000000000000000) >> 18;
+        int reg3Addr = (instruction & 0b00000000000000111110000000000000) >> 13;
         ID_EX_regFile.opcode = (instruction & 0b11110000000000000000000000000000) >> 28;
+
+        // following is the hazard detection unit
+        if (ID_EX_regFile.memRead == 1 && (ID_EX_regFile.reg1 == reg2Addr || ID_EX_regFile.reg1 == reg3Addr))
+        {
+            stallingNeeded=true;
+            IF_ID_regFile.active = 1;
+        }
+        else
+        {
+            controlUnitSignals(ID_EX_regFile.opcode);
+            ID_EX_regFile.ALUSrc = CU.ALUSrc;
+            ID_EX_regFile.branch = CU.branch;
+            ID_EX_regFile.jump = CU.jump;
+            ID_EX_regFile.memRead = CU.memRead;
+            ID_EX_regFile.memWrite = CU.memWrite;
+            ID_EX_regFile.memtoReg = CU.memtoReg;
+            ID_EX_regFile.regWrite = CU.regWrite;
+            ID_EX_regFile.active = true;
+        }
+        int opcode = ID_EX_regFile.opcode;
         ID_EX_regFile.reg1 = (instruction & 0b00001111100000000000000000000000) >> 23;
         ID_EX_regFile.reg2Addr = (instruction & 0b00000000011111000000000000000000) >> 18;
         ID_EX_regFile.reg3Addr = (instruction & 0b00000000000000111110000000000000) >> 13;
         ID_EX_regFile.shamt = (instruction & 0b00000000000000000001111111111111);
         ID_EX_regFile.imm = (instruction & 0b00000000000000111111111111111111);
         ID_EX_regFile.address = (instruction & 0b00001111111111111111111111111111);
-
-        int opcode = ID_EX_regFile.opcode;
-
         ID_EX_regFile.reg2 = registerFile.registerArray[ID_EX_regFile.reg2Addr].regValue;                                                                                           // reads any operands required from the register file
         ID_EX_regFile.reg3 = (opcode == 4 || opcode == 11) ? registerFile.registerArray[ID_EX_regFile.reg1].regValue : registerFile.registerArray[ID_EX_regFile.reg3Addr].regValue; // reads any operands required from the register file
         ID_EX_regFile.PC = IF_ID_regFile.PC;                                                                                                                         // For pipelining; in case we needed PC value in BNE instruction in the execution phase
 
-        controlUnitSignals(ID_EX_regFile.opcode);
-        ID_EX_regFile.ALUSrc = CU.ALUSrc;
-        ID_EX_regFile.branch = CU.branch;
-        ID_EX_regFile.jump = CU.jump;
-        ID_EX_regFile.memRead = CU.memRead;
-        ID_EX_regFile.memWrite = CU.memWrite;
-        ID_EX_regFile.memtoReg = CU.memtoReg;
-        ID_EX_regFile.regWrite = CU.regWrite;
-        ID_EX_regFile.active = true;
-        printf("Decoded instruction: %d\n", instruction);
-        printf("Opcode: %d\n", opcode);
-        printf("---------------------------\n");
+        printf("    Instruction %d is being decoded\n", IF_ID_regFile.PC);
+
+        switch(opcode){
+            case 0: case 1:
+                printf("    Type R\n");
+                printf("    Opcode: %d\n", opcode);
+                printf("    R1: %d\n", ID_EX_regFile.reg1);
+                printf("    R2: %d\n", ID_EX_regFile.reg2Addr);
+                printf("    R3: %d\n", ID_EX_regFile.reg3Addr);
+                break;
+            case 8: case 9:
+                printf("    Type R\n");
+                printf("    Opcode: %d\n", opcode);
+                printf("    R1: %d\n", ID_EX_regFile.reg1);
+                printf("    R2: %d\n", ID_EX_regFile.reg2Addr);
+                printf("    SHAMT: %d\n", ID_EX_regFile.shamt);
+                break;
+            case 2: case 3: case 4: case 5: case 6: case 10: case 11:
+                printf("    Type I\n");
+                printf("    Opcode: %d\n", opcode);
+                printf("    R1: %d\n", ID_EX_regFile.reg1);
+                printf("    R2: %d\n", ID_EX_regFile.reg2Addr);
+                printf("    IMM: %d\n", ID_EX_regFile.imm);
+                break;
+            case 7:
+                printf("    Type J\n");
+                printf("    Opcode: %d\n", opcode);
+                printf("    R1: %d\n", ID_EX_regFile.reg1);
+                printf("    Address: %d\n",ID_EX_regFile.address);
+                break;
+        }
     }
 }
 
@@ -381,32 +432,31 @@ ALUOutput ALU(int operandA, int operandB, int operation)
     int output = 0;
     switch (operation)
     {
-    case 0: // ADD
-        output = operandA + operandB;
-        break;
-    case 1: // SUB
-        output = operandA - operandB;
-        break;
-    case 2: // MUL
-        output = operandA * operandB;
-        break;
-    case 3: // And
-        output = operandA & operandB;
-        break;
-    case 4: // Or
-        output = operandA | operandB;
-        break;
-    case 5: // SLL
-        output = operandA << operandB;
-        break;
-    case 6: // SRL
-        output = operandA >> operandB;
-        break;
+        case 0: // ADD
+            output = operandA + operandB;
+            break;
+        case 1: // SUB
+            output = operandA - operandB;
+            break;
+        case 2: // MUL
+            output = operandA * operandB;
+            break;
+        case 3: // And
+            output = operandA & operandB;
+            break;
+        case 4: // Or
+            output = operandA | operandB;
+            break;
+        case 5: // SLL
+            output = operandA << operandB;
+            break;
+        case 6: // SRL
+            output = operandA >> operandB;
+            break;
     }
 
     ALUOutput outputStruct;
     outputStruct.result = output;
-    printf("ALU Output: %d\n", output);
     outputStruct.zeroflag = (output == 0);
     return outputStruct;
 }
@@ -416,19 +466,26 @@ void memAccess()
     if (EX_MEM_regFile.active)
     {
         EX_MEM_regFile.active = 0;
-        if (EX_MEM_regFile.memRead == 1)
+        if (EX_MEM_regFile.memRead == 1){
+            printf("Memory Access Stage (MA)\n");
             MEM_WB_regFile.readData = mainMemory.mainMemory[EX_MEM_regFile.ALUoutput];
-        else if (EX_MEM_regFile.memWrite == 1)
+            printf("    Address read from is: %d \n",EX_MEM_regFile.ALUoutput);
+            printf("    Data Read from memory: %d \n",MEM_WB_regFile.readData);
+        }
+        else if (EX_MEM_regFile.memWrite == 1){
+            printf("Memory Access Stage (MA)\n");
             mainMemory.mainMemory[EX_MEM_regFile.ALUoutput] = EX_MEM_regFile.reg3; // here I used the third register but this is because I assumed a fixed architecture where I saved the value of R1 in R3 in the reg file
+            printf("    Address written into: %d \n",EX_MEM_regFile.ALUoutput);
+            printf("    Data written into memory: %d \n",EX_MEM_regFile.reg3);
+        }
         //    else if (EX_MEM_regFile.jump==1|| (EX_MEM_regFile.branch==1 && EX_MEM_regFile.zeroFlag!=1))
         //        PC.regValue= EX_MEM_regFile.branchAddition;
+
         MEM_WB_regFile.ALUoutput = EX_MEM_regFile.ALUoutput;
         MEM_WB_regFile.memtoReg = EX_MEM_regFile.memtoReg;
         MEM_WB_regFile.reg1 = EX_MEM_regFile.reg1;
         MEM_WB_regFile.regWrite = EX_MEM_regFile.regWrite;
         MEM_WB_regFile.active = 1;
-        printf("Memory Access Stage (MA) %d\n");
-        printf("---------------------------\n");
     }
 }
 
@@ -436,17 +493,23 @@ void writeBack()
 {
     if (MEM_WB_regFile.active)
     {
+
         MEM_WB_regFile.active = 0;
+
         if (MEM_WB_regFile.regWrite == 1)
         {
-            if (MEM_WB_regFile.memtoReg == 0)
-                registerFile.registerArray[MEM_WB_regFile.reg1].regValue = MEM_WB_regFile.ALUoutput;
-            else
-                registerFile.registerArray[MEM_WB_regFile.reg1].regValue = MEM_WB_regFile.readData;
+            if(MEM_WB_regFile.reg1 != 0) {
+                printf("Write Back Stage (WB)\n");
+                if (MEM_WB_regFile.memtoReg == 0)
+                    registerFile.registerArray[MEM_WB_regFile.reg1].regValue = MEM_WB_regFile.ALUoutput;
+                else
+                    registerFile.registerArray[MEM_WB_regFile.reg1].regValue = MEM_WB_regFile.readData;
+            }
+            printf("    Register %s has value of %d \n",registerFile.registerArray[MEM_WB_regFile.reg1].regName,registerFile.registerArray[MEM_WB_regFile.reg1].regValue);
         }
+
     }
-    printf("Write Back Stage (WB) %d\n");
-    printf("---------------------------\n");
+
 }
 
 void flushPipeline()
@@ -455,30 +518,28 @@ void flushPipeline()
     // memset betakhod ptr (el block el ha fill),value (el ha fill beeh el block),
     // number of bytes to be set to the value
     memset(&ID_EX_regFile, 0, sizeof(ID_EX_regFile));
-    printf("Pipeline Flushed\n");
-    printf("---------------------------\n");
+    printf("    Pipeline Flushed.\n");
 }
 void exec()
 {
     if (ID_EX_regFile.active)
     {
-
         int forwardA = 0;
         int forwardB = 0;
 
         // handling control signals of forwarding
         if (MEM_WB_regFile.regWrite == 1 && MEM_WB_regFile.reg1 != 0 &&
-            !(EX_MEM_regFile.regWrite == 1 && EX_MEM_regFile.reg1 != 0 && EX_MEM_regFile.reg1 != ID_EX_regFile.reg2) && (MEM_WB_regFile.reg1 == ID_EX_regFile.reg2))
+            !(EX_MEM_regFile.regWrite == 1 && EX_MEM_regFile.reg1 != 0 && EX_MEM_regFile.reg1 != ID_EX_regFile.reg2Addr) && (MEM_WB_regFile.reg1 == ID_EX_regFile.reg2Addr))
             forwardA = 1;
 
         if (MEM_WB_regFile.regWrite == 1 && MEM_WB_regFile.reg1 != 0 &&
-            !(EX_MEM_regFile.regWrite == 1 && EX_MEM_regFile.reg1 != 0 && EX_MEM_regFile.reg1 != ID_EX_regFile.reg3) && (MEM_WB_regFile.reg1 == ID_EX_regFile.reg3))
+            !(EX_MEM_regFile.regWrite == 1 && EX_MEM_regFile.reg1 != 0 && EX_MEM_regFile.reg1 != ID_EX_regFile.reg3Addr) && (MEM_WB_regFile.reg1 == ID_EX_regFile.reg3Addr))
             forwardB = 1;
 
-        if (EX_MEM_regFile.regWrite == 1 && EX_MEM_regFile.reg1 != 0 && EX_MEM_regFile.reg1 == ID_EX_regFile.reg2)
+        if (EX_MEM_regFile.regWrite == 1 && EX_MEM_regFile.reg1 != 0 && EX_MEM_regFile.reg1 == ID_EX_regFile.reg2Addr)
             forwardA = 2;
 
-        if (EX_MEM_regFile.regWrite == 1 && EX_MEM_regFile.reg1 != 0 && EX_MEM_regFile.reg1 == ID_EX_regFile.reg3)
+        if (EX_MEM_regFile.regWrite == 1 && EX_MEM_regFile.reg1 != 0 && EX_MEM_regFile.reg1 == ID_EX_regFile.reg3Addr)
             forwardB = 2;
 
         ID_EX_regFile.active = 0;
@@ -497,95 +558,147 @@ void exec()
             operandA = EX_MEM_regFile.ALUoutput;
         int operandB;
         int zeroFlag;
+        printf("Execute Stage \n");
+        printf("    Instruction %d is being executed\n", ID_EX_regFile.PC);
         // when checking with the group, the rhs should come from ID_EX_regFile and the lhs from EX_MEM_regFile
         switch (opCode)
         {
-        case 0: // ADD
-            if (forwardB == 0)
-                operandB = ID_EX_regFile.reg3;
-            else if (forwardB == 1)
-            {
-                if (MEM_WB_regFile.memtoReg == 0)
-                    operandB = MEM_WB_regFile.ALUoutput;
+            case 0: // ADD
+                printf("    Addition is being executed\n");
+                if (forwardB == 0)
+                    operandB = ID_EX_regFile.reg3;
+                else if (forwardB == 1)
+                {
+                    if (MEM_WB_regFile.memtoReg == 0)
+                        operandB = MEM_WB_regFile.ALUoutput;
+                    else
+                        operandB = MEM_WB_regFile.readData;
+                }
+                else if (forwardB == 2)
+                    operandB = EX_MEM_regFile.ALUoutput;
+                EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 0).result;
+                printf("        Operand 1:%d\n", operandA);
+                printf("        Operand 2:%d\n", operandB);
+                printf("        ALU Result:%d\n",EX_MEM_regFile.ALUoutput);
+                break;
+            case 1: // SUB
+            printf("    Subtraction is being executed\n");
+                if (forwardB == 0)
+                    operandB = ID_EX_regFile.reg3;
+                else if (forwardB == 1)
+                {
+                    if (MEM_WB_regFile.memtoReg == 0)
+                        operandB = MEM_WB_regFile.ALUoutput;
+                    else
+                        operandB = MEM_WB_regFile.readData;
+                }
+                else if (forwardB == 2)
+                    operandB = EX_MEM_regFile.ALUoutput;
+                EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 1).result;
+
+                printf("        Operand 1: %d\n", operandA);
+                printf("        Operand 2: %d\n", operandB);
+                printf("        ALU Result: %d\n",EX_MEM_regFile.ALUoutput);
+
+                break;
+            case 2: // MULI
+                printf("    Multiply Immediate is being executed\n");
+                operandB = ID_EX_regFile.imm;
+                EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 2).result;
+                printf("        Operand 1: %d\n", operandA);
+                printf("        Operand 2: %d\n", operandB);
+                printf("        ALU Result: %d\n",EX_MEM_regFile.ALUoutput);
+
+                break;
+            case 3: // ADDI
+                printf("    ADD Immediate is being executed\n");
+                operandB = ID_EX_regFile.imm;
+                EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 0).result;
+                printf("        Operand 1: %d\n", operandA);
+                printf("        Operand 2: %d\n", operandB);
+                printf("        ALU Result: %d\n",EX_MEM_regFile.ALUoutput);
+
+                break;
+            case 4: // BNE
+                if (forwardB == 0)
+                    operandB = ID_EX_regFile.reg3; // value of reg1 is inside this reg
+                else if (forwardB == 1)
+                {
+                    if (MEM_WB_regFile.memtoReg == 0)
+                        operandB = MEM_WB_regFile.ALUoutput;
+                    else
+                        operandB = MEM_WB_regFile.readData;
+                }
+                else if (forwardB == 2)
+                    operandB = EX_MEM_regFile.ALUoutput;
+                ALUOutput out = ALU(operandA, operandB, 1);
+                if (ID_EX_regFile.branch == 1 && out.zeroflag != 1)
+                {
+                    printf("    Branch on NOT EQUAL is being executed\n");
+                    PC.regValue = ID_EX_regFile.PC + out.result;
+                    printf("        Branching to Address: %d\n",PC.regValue);
+                    flushPipeline();
+                }
                 else
-                    operandB = MEM_WB_regFile.readData;
-            }
-            else if (forwardB == 2)
-                operandB = EX_MEM_regFile.ALUoutput;
-            EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 0).result;
-            break;
-        case 1: // SUB
-            if (forwardB == 0)
-                operandB = ID_EX_regFile.reg3;
-            else if (forwardB == 1)
-            {
-                if (MEM_WB_regFile.memtoReg == 0)
-                    operandB = MEM_WB_regFile.ALUoutput;
-                else
-                    operandB = MEM_WB_regFile.readData;
-            }
-            else if (forwardB == 2)
-                operandB = EX_MEM_regFile.ALUoutput;
-            EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 1).result;
-            break;
-        case 2: // MULI
-            operandB = ID_EX_regFile.imm;
-            EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 2).result;
-            break;
-        case 3: // ADDI
-            operandB = ID_EX_regFile.imm;
-            EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 0).result;
-            break;
-        case 4: // BNE
-            if (forwardB == 0)
-                operandB = ID_EX_regFile.reg3; // value of reg1 is inside this reg
-            else if (forwardB == 1)
-            {
-                if (MEM_WB_regFile.memtoReg == 0)
-                    operandB = MEM_WB_regFile.ALUoutput;
-                else
-                    operandB = MEM_WB_regFile.readData;
-            }
-            else if (forwardB == 2)
-                operandB = EX_MEM_regFile.ALUoutput;
-            ALUOutput out = ALU(operandA, operandB, 1);
-            if (ID_EX_regFile.branch == 1 && out.zeroflag != 1)
-            {
-                PC.regValue = ID_EX_regFile.PC + out.result;
-                flushPipeline();
-            }
-            break;
-        case 5: // ANDI
-            operandB = ID_EX_regFile.imm;
-            EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 3).result;
-            break;
-        case 6: // ORI
-            operandB = ID_EX_regFile.imm;
-            EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 4).result;
-            break;
-        case 7: // J
-            if (ID_EX_regFile.jump == 1)
-            {
-                PC.regValue = (ID_EX_regFile.PC & 0b11110000000000000000000000000000) | ID_EX_regFile.address;
-                flushPipeline();
-            }
-            break;
-        case 8: // SLL
-            operandB = ID_EX_regFile.shamt;
-            EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 5).result;
-            break;
-        case 9: // SRL
-            operandB = ID_EX_regFile.shamt;
-            EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 6).result;
-            break;
-        case 10: // LW
-            operandB = ID_EX_regFile.imm;
-            EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 0).result;
-            break;
-        case 11: // SW
-            operandB = ID_EX_regFile.imm;
-            EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 0).result;
-            break;
+                    printf("    Branch on NOT EQUAL condition failed\n");
+                break;
+            case 5: // ANDI
+                printf("    AND Immediate is being executed\n");
+                operandB = ID_EX_regFile.imm;
+                EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 3).result;
+                printf("        Operand 1: %d\n", operandA);
+                printf("        Operand 2: %d\n", operandB);
+                printf("        ALU Result: %d\n",EX_MEM_regFile.ALUoutput);
+                break;
+            case 6: // ORI
+                printf("    OR Immeediate is being executed\n");
+                operandB = ID_EX_regFile.imm;
+                EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 4).result;
+                printf("        Operand 1: %d\n", operandA);
+                printf("        Operand 2: %d\n", operandB);
+                printf("        ALU Result: %d\n",EX_MEM_regFile.ALUoutput);
+                break;
+            case 7: // J
+                if (ID_EX_regFile.jump == 1)
+                {
+                    printf("    JUMP is being executed\n");
+                    PC.regValue = (ID_EX_regFile.PC & 0b11110000000000000000000000000000) | ID_EX_regFile.address;
+                    printf("        Jumping to Address: %d\n",PC.regValue);
+                    flushPipeline();
+                }
+                break;
+            case 8: // SLL
+                printf("    Shift Left Logical is being executed\n");
+                operandB = ID_EX_regFile.shamt;
+                EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 5).result;
+                printf("        Operand 1: %d\n", operandA);
+                printf("        Shift Amount: %d\n", operandB);
+                printf("        ALU Result: %d\n",EX_MEM_regFile.ALUoutput);
+                break;
+            case 9: // SRL
+                printf("    Shift Right Logical is being executed\n");
+                operandB = ID_EX_regFile.shamt;
+                EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 6).result;
+                printf("        Operand 1: %d\n", operandA);
+                printf("        Shift Amount: %d\n", operandB);
+                printf("        ALU Result: %d\n",EX_MEM_regFile.ALUoutput);
+                break;
+            case 10: // LW
+                printf("    Load Word is being executed\n");
+                operandB = ID_EX_regFile.imm;
+                EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 0).result;
+                printf("        Base Address: %d\n", operandA);
+                printf("        Offset Value: %d\n", operandB);
+                printf("        Result Address: %d\n",EX_MEM_regFile.ALUoutput);
+                break;
+            case 11: // SW
+                printf("    Store Word is being executed\n");
+                operandB = ID_EX_regFile.imm;
+                EX_MEM_regFile.ALUoutput = ALU(operandA, operandB, 0).result;
+                printf("        Base Address: %d\n", operandA);
+                printf("        Offset Value: %d\n", operandB);
+                printf("        Result Address: %d\n",EX_MEM_regFile.ALUoutput);
+                break;
         }
         EX_MEM_regFile.reg1 = ID_EX_regFile.reg1;
         EX_MEM_regFile.memRead = ID_EX_regFile.memRead;
@@ -593,37 +706,53 @@ void exec()
         EX_MEM_regFile.memtoReg = ID_EX_regFile.memtoReg;
         EX_MEM_regFile.regWrite = ID_EX_regFile.regWrite; // check that these signals are initialized somewhere
         EX_MEM_regFile.active = 1;
-        printf("Executing........with opcode %d \n", opCode);
-        printf("---------------------------\n");
+
+//        printf("memRead Signal: %d \n", EX_MEM_regFile.memRead);
+//        printf("memWrite Signal: %d \n", EX_MEM_regFile.memWrite);
+//        printf("memtoReg Signal: %d \n", EX_MEM_regFile.memtoReg);
+//        printf("regWrite Signal: %d \n", EX_MEM_regFile.regWrite);
     }
 }
 
 int main()
 {
+    printf("Start of Program\n");
     registerFile.registerArray = registerInit(32);
     parse();
     int i = 0;
     while (fetch_active || IF_ID_regFile.active || ID_EX_regFile.active || EX_MEM_regFile.active || MEM_WB_regFile.active)
     {
+        printf("---------------------------\n");
         printf("Cycle %d:\n", ++i);
         if (i % 2 == 0)
         {
-            memAccess(); //it wont work except when active and this triggered by the exec
+            memAccess(); //it won't work except when active and this triggered by the exec
         }
         else
         {
-            writeBack(); //it wont work except when active and this triggered by the memAccess
-            exec(); //it wont work except when active and this triggered by the decode
-            decode(); //it wont work except when active and this triggered by the fetch
+            writeBack(); //it won't work except when active and this triggered by the memAccess
+            exec(); //it won't work except when active and this triggered by the decode
+            decode(); //it won't work except when active and this triggered by the fetch
             fetch(); //it will stop working after reading the first 0 instruction
         }
     }
 
-    for (int i = 0; i < 10; ++i)
+    for (int i = 0; i < 32; i++)
     {
         printf("Register Name: %s\n", registerFile.registerArray[i].regName);
         printf("Register Value: %d\n", registerFile.registerArray[i].regValue);
     }
+
+//    for(int i =0; i < 2048; i++)
+//    {
+//        if(i<1024)
+//            printf("Instruction Address: %d\n", i);
+//        else
+//            printf("Data Address: %d\n", i);
+//        printf("Memory Value: %d\n", mainMemory.mainMemory[i]);
+//    }
+    printf("Memory Value: %d\n", mainMemory.mainMemory[1024]);
+    printf("End of Program\n");
 
     return 0;
 }
