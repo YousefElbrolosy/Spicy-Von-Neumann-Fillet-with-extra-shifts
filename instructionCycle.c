@@ -71,6 +71,7 @@ typedef struct
     int memtoReg; // control signals (needed for write back phase)
     int regWrite; // control signals (needed for write back phase)
 
+
     bool active;
     int instNum; //to be able to know which instruction I'm in for printing purposes
 } ID_EX;
@@ -78,6 +79,8 @@ typedef struct
 typedef struct
 {
     int ALUoutput;
+    int prevALUOutput;  //needed for controlling a hazard
+
     // int zeroFlag;
     int reg1; // number of reg 1 that will be the destination
     int reg3; // value of reg3
@@ -214,7 +217,6 @@ void parse()
     int instructionType;
     int registerSource;
     int address;
-    int shamt;
     char instType;
 
     input = fopen("filename.txt", "r");
@@ -297,10 +299,10 @@ void parse()
             case 'R':
                 R1 = parseRegNum(instructionSplitted[1]);
                 R2 = parseRegNum(instructionSplitted[2]);
-                if (strcmp(instructionSplitted[0], "ADD") || strcmp(instructionSplitted[0], "SUB"))
+                if (strcmp(instructionSplitted[0], "ADD") == 0 || strcmp(instructionSplitted[0], "SUB") == 0)
                     R3 = parseRegNum(instructionSplitted[3]);
                 else
-                    shamt = parseRegNum(instructionSplitted[3]);
+                    shamt = parseInt(instructionSplitted[3]);
                 instructionType = instructionType | R1 << 23 | R2 << 18 | R3 << 13 | shamt;
                 break;
             case 'I':
@@ -308,7 +310,6 @@ void parse()
                 R2 = parseRegNum(instructionSplitted[2]);
                 imm = parseInt(instructionSplitted[3]);
                 instructionType = instructionType | R1 << 23 | R2 << 18 | imm;
-
                 break;
             case 'J':
                 address = parseInt(instructionSplitted[1]);
@@ -480,8 +481,11 @@ void memAccess()
             printf("    Data Read from memory: %d \n",MEM_WB_regFile.readData);
         }
         else if (EX_MEM_regFile.memWrite == 1){
+            if (ID_EX_regFile.reg1== EX_MEM_regFile.reg1)
+                mainMemory.mainMemory[EX_MEM_regFile.ALUoutput] = EX_MEM_regFile.prevALUOutput; // here I used the third register but this is because I assumed a fixed architecture where I saved the value of R1 in R3 in the reg file
+            else
+                mainMemory.mainMemory[EX_MEM_regFile.ALUoutput] = EX_MEM_regFile.reg3; // here I used the third register but this is because I assumed a fixed architecture where I saved the value of R1 in R3 in the reg file
             printf("Memory Access Stage (MA) for instruction %d\n",EX_MEM_regFile.instNum);
-            mainMemory.mainMemory[EX_MEM_regFile.ALUoutput] = EX_MEM_regFile.reg3; // here I used the third register but this is because I assumed a fixed architecture where I saved the value of R1 in R3 in the reg file
             printf("    Address written into: %d \n",EX_MEM_regFile.ALUoutput);
             printf("    Data written into memory: %d \n",EX_MEM_regFile.reg3);
         }
@@ -569,6 +573,7 @@ void exec()
         printf("Execute Stage \n");
         printf("    Instruction %d is being executed\n", ID_EX_regFile.instNum);
         // when checking with the group, the rhs should come from ID_EX_regFile and the lhs from EX_MEM_regFile
+        EX_MEM_regFile.prevALUOutput= EX_MEM_regFile.ALUoutput;
         switch (opCode)
         {
             case 0: // ADD
@@ -709,6 +714,7 @@ void exec()
                 break;
         }
         EX_MEM_regFile.reg1 = ID_EX_regFile.reg1;
+        EX_MEM_regFile.reg3 = ID_EX_regFile.reg3;
         EX_MEM_regFile.memRead = ID_EX_regFile.memRead;
         EX_MEM_regFile.memWrite = ID_EX_regFile.memWrite;
         EX_MEM_regFile.memtoReg = ID_EX_regFile.memtoReg;
