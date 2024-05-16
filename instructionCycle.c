@@ -778,7 +778,7 @@ int main()
         }
     }
 
-    for (int j = 0; i < 32; i++)
+    for (int j = 0; j < 32; j++)
     {
         printf("Register Name: %s\n", registerFile.registerArray[j].regName);
         printf("Register Value: %d\n", registerFile.registerArray[j].regValue);
