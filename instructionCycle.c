@@ -44,6 +44,8 @@ typedef struct
     int PC;
     int IR;
     bool active;
+    int instNum; //to be able to know which instruction I'm in for printing purposes
+
 } IF_ID;
 
 typedef struct
@@ -70,6 +72,7 @@ typedef struct
     int regWrite; // control signals (needed for write back phase)
 
     bool active;
+    int instNum; //to be able to know which instruction I'm in for printing purposes
 } ID_EX;
 
 typedef struct
@@ -89,6 +92,8 @@ typedef struct
     int regWrite; // control signals (needed for write back phase)
 
     bool active;
+    int instNum; //to be able to know which instruction I'm in for printing purposes
+
 } EX_MEM;
 
 typedef struct
@@ -101,6 +106,8 @@ typedef struct
     int regWrite; // control signals (needed for write back phase)
 
     bool active;
+    int instNum; //to be able to know which instruction I'm in for printing purposes
+
 } MEM_WB;
 
 // Global Initialisation
@@ -324,8 +331,8 @@ void fetch()
             return;
         }
         printf("Fetch Stage \n");
-        printf("    Instruction %d is being fetched: %b\n", PC.regValue, instruction);
-        PC.regValue++;
+        printf("    Instruction %d is being fetched \n", PC.regValue, instruction);
+        IF_ID_regFile.instNum= PC.regValue++;
         if (stallingNeeded){
             PC.regValue--;
             stallingNeeded=false;
@@ -337,7 +344,6 @@ void fetch()
             IF_ID_regFile.IR = instruction;
             IF_ID_regFile.PC = PC.regValue;
         }
-
 
     }
 }
@@ -391,9 +397,10 @@ void decode()
         ID_EX_regFile.address = (instruction & 0b00001111111111111111111111111111);
         ID_EX_regFile.reg2 = registerFile.registerArray[ID_EX_regFile.reg2Addr].regValue;                                                                                           // reads any operands required from the register file
         ID_EX_regFile.reg3 = (opcode == 4 || opcode == 11) ? registerFile.registerArray[ID_EX_regFile.reg1].regValue : registerFile.registerArray[ID_EX_regFile.reg3Addr].regValue; // reads any operands required from the register file
-        ID_EX_regFile.PC = IF_ID_regFile.PC;                                                                                                                         // For pipelining; in case we needed PC value in BNE instruction in the execution phase
+        ID_EX_regFile.PC = IF_ID_regFile.PC;
+        ID_EX_regFile.instNum= IF_ID_regFile.instNum;// For pipelining; in case we needed PC value in BNE instruction in the execution phase
 
-        printf("    Instruction %d is being decoded\n", IF_ID_regFile.PC);
+        printf("    Instruction %d is being decoded\n", IF_ID_regFile.instNum);
 
         switch(opcode){
             case 0: case 1:
@@ -473,7 +480,7 @@ void memAccess()
             printf("    Data Read from memory: %d \n",MEM_WB_regFile.readData);
         }
         else if (EX_MEM_regFile.memWrite == 1){
-            printf("Memory Access Stage (MA)\n");
+            printf("Memory Access Stage (MA) for instruction %d\n",EX_MEM_regFile.instNum);
             mainMemory.mainMemory[EX_MEM_regFile.ALUoutput] = EX_MEM_regFile.reg3; // here I used the third register but this is because I assumed a fixed architecture where I saved the value of R1 in R3 in the reg file
             printf("    Address written into: %d \n",EX_MEM_regFile.ALUoutput);
             printf("    Data written into memory: %d \n",EX_MEM_regFile.reg3);
@@ -486,6 +493,7 @@ void memAccess()
         MEM_WB_regFile.reg1 = EX_MEM_regFile.reg1;
         MEM_WB_regFile.regWrite = EX_MEM_regFile.regWrite;
         MEM_WB_regFile.active = 1;
+        MEM_WB_regFile.instNum = EX_MEM_regFile.instNum;
     }
 }
 
@@ -499,7 +507,7 @@ void writeBack()
         if (MEM_WB_regFile.regWrite == 1)
         {
             if(MEM_WB_regFile.reg1 != 0) {
-                printf("Write Back Stage (WB)\n");
+                printf("Write Back Stage (WB) for instruction %d\n",MEM_WB_regFile.instNum);
                 if (MEM_WB_regFile.memtoReg == 0)
                     registerFile.registerArray[MEM_WB_regFile.reg1].regValue = MEM_WB_regFile.ALUoutput;
                 else
@@ -559,7 +567,7 @@ void exec()
         int operandB;
         int zeroFlag;
         printf("Execute Stage \n");
-        printf("    Instruction %d is being executed\n", ID_EX_regFile.PC);
+        printf("    Instruction %d is being executed\n", ID_EX_regFile.instNum);
         // when checking with the group, the rhs should come from ID_EX_regFile and the lhs from EX_MEM_regFile
         switch (opCode)
         {
@@ -706,6 +714,7 @@ void exec()
         EX_MEM_regFile.memtoReg = ID_EX_regFile.memtoReg;
         EX_MEM_regFile.regWrite = ID_EX_regFile.regWrite; // check that these signals are initialized somewhere
         EX_MEM_regFile.active = 1;
+        EX_MEM_regFile.instNum = ID_EX_regFile.instNum;
 
 //        printf("memRead Signal: %d \n", EX_MEM_regFile.memRead);
 //        printf("memWrite Signal: %d \n", EX_MEM_regFile.memWrite);
