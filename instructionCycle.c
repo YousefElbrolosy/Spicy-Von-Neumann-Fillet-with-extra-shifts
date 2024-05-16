@@ -333,13 +333,11 @@ void fetch()
             return;
         }
         printf("Fetch Stage \n");
-        printf("    Instruction %d is being fetched \n", PC.regValue, instruction);
+        printf("    Instruction %d is being fetched %b\n", PC.regValue, instruction);
         IF_ID_regFile.instNum= PC.regValue++;
         if (stallingNeeded){
             PC.regValue--;
             stallingNeeded=false;
-            IF_ID_regFile.active = 0;
-
         }
         else {
             IF_ID_regFile.active = true;
@@ -485,7 +483,7 @@ void memAccess()
             printf("    Data Read from memory: %d \n",MEM_WB_regFile.readData);
         }
         else if (EX_MEM_regFile.memWrite == 1){
-            if (ID_EX_regFile.reg1== EX_MEM_regFile.reg1)
+            if (MEM_WB_regFile.reg1==EX_MEM_regFile.reg1)
                 mainMemory.mainMemory[EX_MEM_regFile.ALUoutput] = EX_MEM_regFile.prevALUOutput; // here I used the third register but this is because I assumed a fixed architecture where I saved the value of R1 in R3 in the reg file
             else
                 mainMemory.mainMemory[EX_MEM_regFile.ALUoutput] = EX_MEM_regFile.reg3; // here I used the third register but this is because I assumed a fixed architecture where I saved the value of R1 in R3 in the reg file
@@ -502,6 +500,7 @@ void memAccess()
         MEM_WB_regFile.regWrite = EX_MEM_regFile.regWrite;
         MEM_WB_regFile.active = 1;
         MEM_WB_regFile.instNum = EX_MEM_regFile.instNum;
+        EX_MEM_regFile.reg1 = 0;
     }
 }
 
@@ -652,7 +651,7 @@ void exec()
                 if (ID_EX_regFile.branch == 1 && out.zeroflag != 1)
                 {
                     printf("    Branch on NOT EQUAL is being executed\n");
-                    PC.regValue = ID_EX_regFile.PC + out.result;
+                    PC.regValue = ID_EX_regFile.PC + ID_EX_regFile.imm;
                     printf("        Branching to Address: %d\n",PC.regValue);
                     flushPipeline();
                 }
@@ -726,6 +725,7 @@ void exec()
         EX_MEM_regFile.active = 1;
         EX_MEM_regFile.instNum = ID_EX_regFile.instNum;
         ID_EX_regFile.reg1=0;
+        ID_EX_regFile.memRead = 0;
 //        printf("memRead Signal: %d \n", EX_MEM_regFile.memRead);
 //        printf("memWrite Signal: %d \n", EX_MEM_regFile.memWrite);
 //        printf("memtoReg Signal: %d \n", EX_MEM_regFile.memtoReg);
