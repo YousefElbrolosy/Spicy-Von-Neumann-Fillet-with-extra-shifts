@@ -394,7 +394,10 @@ void decode()
         ID_EX_regFile.reg2Addr = (instruction & 0b00000000011111000000000000000000) >> 18;
         ID_EX_regFile.reg3Addr = (instruction & 0b00000000000000111110000000000000) >> 13;
         ID_EX_regFile.shamt = (instruction & 0b00000000000000000001111111111111);
-        ID_EX_regFile.imm = (instruction & 0b00000000000000111111111111111111);
+        int signBit = instruction & 0b00000000000000100000000000000000;
+        ID_EX_regFile.imm = instruction & 0b00000000000000111111111111111111;
+        if (signBit == 0b100000000000000000)
+            ID_EX_regFile.imm = 0b11111111111111000000000000000000 | ID_EX_regFile.imm;
         ID_EX_regFile.address = (instruction & 0b00001111111111111111111111111111);
         ID_EX_regFile.reg2 = registerFile.registerArray[ID_EX_regFile.reg2Addr].regValue;                                                                                           // reads any operands required from the register file
         ID_EX_regFile.reg3 = (opcode == 4 || opcode == 11) ? registerFile.registerArray[ID_EX_regFile.reg1].regValue : registerFile.registerArray[ID_EX_regFile.reg3Addr].regValue; // reads any operands required from the register file
