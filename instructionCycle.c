@@ -723,6 +723,16 @@ void exec()
     }
 }
 
+void printDecode() {
+    if (IF_ID_regFile.active)
+        printf("    Instruction %d started decoding \n",IF_ID_regFile.instNum);
+}
+
+void printExecute() {
+    if (ID_EX_regFile.active)
+        printf("    Instruction %d started executing \n",ID_EX_regFile.instNum);
+}
+
 int main()
 {
     printf("Start of Program\n");
@@ -736,6 +746,8 @@ int main()
         if (i % 2 == 0)
         {
             memAccess(); //it won't work except when active and this triggered by the exec
+            printExecute();
+            printDecode();
         }
         else
         {
