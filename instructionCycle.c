@@ -778,21 +778,20 @@ int main()
         }
     }
 
-    for (int i = 0; i < 32; i++)
+    for (int j = 0; i < 32; i++)
     {
-        printf("Register Name: %s\n", registerFile.registerArray[i].regName);
-        printf("Register Value: %d\n", registerFile.registerArray[i].regValue);
+        printf("Register Name: %s\n", registerFile.registerArray[j].regName);
+        printf("Register Value: %d\n", registerFile.registerArray[j].regValue);
     }
 
-    for(int i =0; i < 2048; i++)
+    for(int j =0; j < 2048; j++)
     {
         if(i<1024)
-            printf("Instruction Address: %d\n", i);
+            printf("Instruction Address: %d\n", j);
         else
-            printf("Data Address: %d\n", i);
-        printf("Memory Value: %d\n", mainMemory.mainMemory[i]);
+            printf("Data Address: %d\n", j);
+        printf("Memory Value: %d\n", mainMemory.mainMemory[j]);
     }
-    printf("Memory Value: %d\n", mainMemory.mainMemory[1024]);
     printf("End of Program\n");
 
     return 0;
