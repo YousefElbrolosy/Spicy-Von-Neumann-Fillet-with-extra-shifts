@@ -132,6 +132,7 @@ EX_MEM EX_MEM_regFile;
 MEM_WB MEM_WB_regFile;
 int fetch_active = 1;
 bool stallingNeeded = 0;
+IF_ID stalledRegFile;
 
 
 Register *registerInit(int regCount)
@@ -341,7 +342,7 @@ void fetch()
         }
         printf(BLU"Fetch Stage \n"RESET);
         printf( BLU"    Instruction %d is being fetched %b\n"RESET ,PC.regValue, instruction);
-        IF_ID_regFile.instNum= PC.regValue++;
+        PC.regValue++;
         if (stallingNeeded){
             PC.regValue--;
             stallingNeeded=false;
@@ -350,6 +351,7 @@ void fetch()
             IF_ID_regFile.active = true;
             IF_ID_regFile.IR = instruction;
             IF_ID_regFile.PC = PC.regValue;
+            IF_ID_regFile.instNum=PC.regValue-1;
         }
 
     }
@@ -382,6 +384,14 @@ void decode()
         {
             stallingNeeded=true;
             IF_ID_regFile.active = 1;
+            ID_EX_regFile.ALUSrc = 0;
+            ID_EX_regFile.branch = 0;
+            ID_EX_regFile.jump =0;
+            ID_EX_regFile.memRead = 0;
+            ID_EX_regFile.memWrite = 0;
+            ID_EX_regFile.memtoReg = 0;
+            ID_EX_regFile.regWrite = 0;
+
         }
         else
         {
@@ -395,6 +405,7 @@ void decode()
             ID_EX_regFile.regWrite = CU.regWrite;
             ID_EX_regFile.active = true;
         }
+
         int opcode = ID_EX_regFile.opcode;
         ID_EX_regFile.reg1 = (instruction & 0b00001111100000000000000000000000) >> 23;
         ID_EX_regFile.reg2Addr = (instruction & 0b00000000011111000000000000000000) >> 18;
@@ -440,6 +451,9 @@ void decode()
                 printf("    R1: %d\n", ID_EX_regFile.reg1);
                 printf("    Address: %d\n" RESET,ID_EX_regFile.address);
                 break;
+        }
+        if (stallingNeeded) {
+        printf("    Instruction %d discovered that STALLING IS NEEDED\n", IF_ID_regFile.instNum);
         }
     }
 }
@@ -490,14 +504,20 @@ void memAccess()
             printf("    Address read from is: %d \n",EX_MEM_regFile.ALUoutput);
             printf("    Data Read from memory: %d \n",MEM_WB_regFile.readData);
         }
-        else if (EX_MEM_regFile.memWrite == 1){
-            if (MEM_WB_regFile.reg1==EX_MEM_regFile.reg1)
+        else if (EX_MEM_regFile.memWrite == 1) {
+            bool printALU=false;
+            if (MEM_WB_regFile.reg1==EX_MEM_regFile.reg1){
                 mainMemory.mainMemory[EX_MEM_regFile.ALUoutput] = EX_MEM_regFile.prevALUOutput; // here I used the third register but this is because I assumed a fixed architecture where I saved the value of R1 in R3 in the reg file
+                printALU=true;
+            }
             else
                 mainMemory.mainMemory[EX_MEM_regFile.ALUoutput] = EX_MEM_regFile.reg3; // here I used the third register but this is because I assumed a fixed architecture where I saved the value of R1 in R3 in the reg file
             printf("Memory Access Stage (MA) for instruction %d\n",EX_MEM_regFile.instNum);
             printf("    Address written into: %d \n",EX_MEM_regFile.ALUoutput);
-            printf("    Data written into memory: %d \n",EX_MEM_regFile.reg3);
+            if (printALU)
+                printf("    Data written into memory: %d \n",EX_MEM_regFile.prevALUOutput);
+            else
+                printf("    Data written into memory: %d \n",EX_MEM_regFile.reg3);
         }
         //    else if (EX_MEM_regFile.jump==1|| (EX_MEM_regFile.branch==1 && EX_MEM_regFile.zeroFlag!=1))
         //        PC.regValue= EX_MEM_regFile.branchAddition;
@@ -734,8 +754,7 @@ void exec()
         EX_MEM_regFile.regWrite = ID_EX_regFile.regWrite; // check that these signals are initialized somewhere
         EX_MEM_regFile.active = 1;
         EX_MEM_regFile.instNum = ID_EX_regFile.instNum;
-        ID_EX_regFile.reg1=0;
-        ID_EX_regFile.memRead = 0;
+        // ID_EX_regFile.memRead = 0;
 //        printf("memRead Signal: %d \n", EX_MEM_regFile.memRead);
 //        printf("memWrite Signal: %d \n", EX_MEM_regFile.memWrite);
 //        printf("memtoReg Signal: %d \n", EX_MEM_regFile.memtoReg);
@@ -744,13 +763,17 @@ void exec()
 }
 
 void printDecode() {
-    if (IF_ID_regFile.active)
+    if (IF_ID_regFile.active) {
+        printf(GRN"Decode Stage \n"RESET,IF_ID_regFile.instNum);
         printf(GRN"    Instruction %d started decoding \n"RESET,IF_ID_regFile.instNum);
+    }
 }
 
 void printExecute() {
-    if (ID_EX_regFile.active)
+    if (ID_EX_regFile.active) {
+        printf(MAG"Execute Stage\n"RESET,ID_EX_regFile.instNum);
         printf(MAG"    Instruction %d started executing \n"RESET,ID_EX_regFile.instNum);
+    }
 }
 
 int main()
