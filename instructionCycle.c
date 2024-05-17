@@ -298,7 +298,7 @@ void parse()
         }
         int R1;
         int R2;
-        int R3 = 0;
+        int R3 = 0;//incase it is a shift
         int shamt = 0;
         int imm;
         switch (instType)
@@ -481,7 +481,7 @@ ALUOutput ALU(int operandA, int operandB, int operation)
             output = operandA << operandB;
             break;
         case 6: // SRL
-            output = operandA >> operandB;
+            output = (unsigned int) operandA >> operandB;
             break;
     }
 
@@ -763,14 +763,14 @@ void exec()
 
 void printDecode() {
     if (IF_ID_regFile.active) {
-        printf(GRN"Decode Stage \n"RESET,IF_ID_regFile.instNum);
+        printf(GRN"Decode Stage \n"RESET);
         printf(GRN"    Instruction %d started decoding \n"RESET,IF_ID_regFile.instNum);
     }
 }
 
 void printExecute() {
     if (ID_EX_regFile.active) {
-        printf(MAG"Execute Stage\n"RESET,ID_EX_regFile.instNum);
+        printf(MAG"Execute Stage\n"RESET);
         printf(MAG"    Instruction %d started executing \n"RESET,ID_EX_regFile.instNum);
     }
 }

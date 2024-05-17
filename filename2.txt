@@ -1,0 +1,35 @@
+// ANDI Test 1: Positive immediate value ANDED with non-negative regValue
+~~~~~~~~~~~~~
+ADDI R0 R0 5
+ANDI R1 R0 11
+~~~~~~~~~~~~~
+ADDI R2 R2 0
+ANDI R3 R2 10
+
+
+
+
+
+R3-->0
+
+
+
+// ANDI Test 6: Testing ANDI in a data hazard situation
+
+stalling
+~~~~~~~~~~~~~
+LW R3 R1 0
+ANDI R4 R3 5
+ANDI R5 R4 -2
+
+
+
+
+
+
+
+
+
+
+
+

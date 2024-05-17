@@ -1,0 +1,69 @@
+// ANDI Test 1: Positive immediate value ANDED with non-negative regValue in R0
+
+~~~~~~~~~~~~~
+ADDI R0 R0 5
+ANDI R1 R0 11
+~~~~~~~~~~~~~
+ADDI R2 R2 5
+ANDI R3 R2 11
+~~~~~~~~~~~~~
+ADDI R4 R4 0
+ANDI R5 R4 10
+~~~~~~~~~~~~~
+
+// ANDI Test 2: Positive immediate value ANDED with negative regValue
+
+~~~~~~~~~~~~~
+ADDI R4 R4 -15
+ANDI R5 R4 10
+~~~~~~~~~~~~~
+
+// ANDI Test 3: Negative immediate value ANDED with non-negative regValue
+
+~~~~~~~~~~~~~
+ADDI R6 R6 8
+ANDI R7 R6 -8
+~~~~~~~~~~~~~
+ADDI R6 R6 0
+ANDI R7 R6 -5
+~~~~~~~~~~~~~
+
+// ANDI Test 4: Negative immediate value ANDED with negative regValue
+
+~~~~~~~~~~~~~
+ADDI R8 R8 -93
+ANDI R9 R8 -131072
+~~~~~~~~~~~~~
+
+// ANDI Test 5: Testing ANDI in a control/branch hazard situation
+
+~~~~~~~~~~~~~
+ADDI R1 R1 5
+ADDI R2 R2 6
+BNE R1 R2 6
+ANDI 12 2 5
+OR $13, $2, $6
+ADD $14, $4, $2
+LW R4 R1 1
+~~~~~~~~~~~~~
+
+// ANDI Test 6: Testing ANDI in a data hazard situation
+
+forwarding
+~~~~~~~~~~~~~
+ADDI R1 R1 1
+ADDI R3 R3 2
+
+SUB R2 R1 R3
+ANDI R12 R2 2
+ANDI R13 R2 -2
+~~~~~~~~~~~~~
+
+stalling
+~~~~~~~~~~~~~
+ADDI R1 R1 1
+ADDI R2 R2 2
+
+LW R3 R1 20
+ANDI R4, R3, 5
+ANDI R5 R4 -2

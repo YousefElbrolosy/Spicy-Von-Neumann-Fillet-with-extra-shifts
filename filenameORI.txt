@@ -1,0 +1,69 @@
+// SLL Test 1: Shifting Left Logical with non-negative regValue
+
+~~~~~~~~~~~~~
+ADDI R0 R0 5
+SLL R1 R0 1
+~~~~~~~~~~~~~
+ADDI R2 R2 5
+SLL R3 R2 0
+~~~~~~~~~~~~~
+ADDI R4 R4 0
+SLL R5 R4 2
+~~~~~~~~~~~~~
+
+// SLL Test 2: Shifting Left Logical with negative regValue
+
+~~~~~~~~~~~~~
+ADDI R4 R4 -15
+SLL R5 R4 10
+~~~~~~~~~~~~~
+
+// SLL Test 3: Negative immediate value ANDED with non-negative regValue
+
+~~~~~~~~~~~~~
+ADDI R6 R6 8
+SLL R7 R6 -8
+~~~~~~~~~~~~~
+ADDI R6 R6 0
+SLL R7 R6 -5
+~~~~~~~~~~~~~
+
+// SLL Test 4: Negative immediate value ANDED with negative regValue
+
+~~~~~~~~~~~~~
+ADDI R8 R8 -93
+SLL R9 R8 -131072
+~~~~~~~~~~~~~
+
+// SLL Test 5: Testing SLL in a control/branch hazard situation (jump)
+
+~~~~~~~~~~~~~
+ADDI R1 R1 5
+ADDI R2 R2 6
+BNE R1 R2 6
+SLL 12 2 5
+OR $13, $2, $6
+ADD $14, $4, $2
+LW R4 R1 1
+~~~~~~~~~~~~~
+
+// SLL Test 6: Testing SLL in a data hazard situation
+
+forwarding
+~~~~~~~~~~~~~
+ADDI R1 R1 1
+ADDI R3 R3 2
+
+SUB R2 R1 R3
+SLL R12 R2 2
+SLL R13 R2 -2
+~~~~~~~~~~~~~
+
+stalling
+~~~~~~~~~~~~~
+ADDI R1 R1 1
+ADDI R2 R2 2
+
+LW R3 R1 20
+SLL R4, R3, 5
+SLL R5 R4 -2

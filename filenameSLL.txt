@@ -1,0 +1,56 @@
+// SRL Test 1: Shifting Right Logical with non-negative regValue
+
+~~~~~~~~~~~~~
+ADDI R0 R0 5
+SRL R1 R0 1
+~~~~~~~~~~~~~
+ADDI R2 R2 5
+SRL R3 R2 0
+~~~~~~~~~~~~~
+ADDI R4 R4 0
+SRL R5 R4 2
+~~~~~~~~~~~~~
+
+// SRL Test 2: Shifting Right Logical with negative regValue
+
+~~~~~~~~~~~~~
+ADDI R4 R4 -15
+SRL R5 R4 3
+~~~~~~~~~~~~~
+
+
+// SRL Test 3: Testing SRL in a control/branch hazard situation
+
+~~~~~~~~~~~~~
+ADDI R1 R1 4
+ADDI R2 R2 6
+BNE R1 R2 1
+SRL R12 R2 1
+LW R3 R1 0
+SRL R13 R2 2
+~~~~~~~~~~~~~
+
+// SRL Test 4: Testing SRL in a data hazard situation
+
+forwarding
+~~~~~~~~~~~~~
+ADDI R1 R1 1
+ADDI R3 R3 2
+
+SUB R2 R1 R3
+SRL R12 R2 2
+SRL R13 R2 1
+~~~~~~~~~~~~~
+
+stalling
+~~~~~~~~~~~~~
+ADDI R1 R1 1
+ADDI R2 R2 2
+
+LW R3 R1 0
+SRL R4 R3 1
+SRL R5 R4 1
+
+
+
+
