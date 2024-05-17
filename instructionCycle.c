@@ -132,7 +132,6 @@ EX_MEM EX_MEM_regFile;
 MEM_WB MEM_WB_regFile;
 int fetch_active = 1;
 bool stallingNeeded = 0;
-IF_ID stalledRegFile;
 
 
 Register *registerInit(int regCount)
